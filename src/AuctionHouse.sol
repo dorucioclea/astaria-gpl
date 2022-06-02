@@ -64,7 +64,8 @@ contract AuctionHouse is Auth, IAuctionHouse {
         uint256 reservePrice,
         address[] calldata recipients,
         uint256[] calldata amounts,
-        address liquidator
+        address initiator,
+        uint256 initiatorFee
     ) external requiresAuth returns (uint256) {
         unchecked {
             ++_auctionIdTracker;
@@ -80,7 +81,8 @@ contract AuctionHouse is Auth, IAuctionHouse {
             bidder: address(0),
             recipients: recipients,
             amounts: amounts,
-            liquidator: liquidator
+            initiator: initiator,
+            initiatorFee: initiatorFee
         });
 
         emit AuctionCreated(auctionId, tokenId, duration, reservePrice);
@@ -264,6 +266,15 @@ contract AuctionHouse is Auth, IAuctionHouse {
         require(transferAmount > uint256(0), "cannot send nothing");
 
         Auction storage auction = auctions[auctionId];
+
+        uint256 initiatorPayment = (transferAmount * auction.initiatorFee) /
+            100;
+        TRANSFER_PROXY.tokenTransferFrom(
+            weth,
+            payee,
+            auction.initiator,
+            initiatorPayment
+        );
 
         // TODO: pay out liquidator before paying out lien holders
         for (uint256 i = 0; i < auction.recipients.length; ++i) {

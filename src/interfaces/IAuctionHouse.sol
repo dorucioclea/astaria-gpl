@@ -16,7 +16,8 @@ interface IAuctionHouse {
         address[] recipients;
         uint256[] amounts;
         address bidder;
-        address liquidator;
+        address initiator;
+        uint256 initiatorFee;
     }
 
     event AuctionCreated(
@@ -62,7 +63,8 @@ interface IAuctionHouse {
         uint256 reservePrice,
         address[] memory vaults,
         uint256[] memory amounts,
-        address liquidator
+        address initiator,
+        uint256 initiatorFee
     ) external returns (uint256);
 
     function createBid(uint256 auctionId, uint256 amount) external;
