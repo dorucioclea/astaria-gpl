@@ -275,8 +275,8 @@ contract AuctionHouse is Auth, IAuctionHouse {
             auction.initiator,
             initiatorPayment
         );
+        transferAmount -= initiatorPayment;
 
-        // TODO: pay out liquidator before paying out lien holders
         for (uint256 i = 0; i < auction.recipients.length; ++i) {
             uint256 payment;
             address recipient = auction.recipients[i];
