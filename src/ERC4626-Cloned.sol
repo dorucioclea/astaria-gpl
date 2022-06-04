@@ -17,7 +17,7 @@ contract Base is Clone {
         return _getArgAddress(20);
     }
 
-    function factory() public pure returns (address) {
+    function router() public pure returns (address) {
         return _getArgAddress(40);
     }
 
