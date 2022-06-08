@@ -10,6 +10,7 @@ import {IAuctionHouse} from "./interfaces/IAuctionHouse.sol";
 import {ITransferProxy} from "./interfaces/ITransferProxy.sol";
 
 import "./interfaces/IWETH9.sol";
+import "../../../src/interfaces/IStarNFT.sol";
 
 contract AuctionHouse is Auth, IAuctionHouse {
     // The minimum amount of time left in an auction after a new bid is created
@@ -22,9 +23,11 @@ contract AuctionHouse is Auth, IAuctionHouse {
     address weth;
 
     ITransferProxy TRANSFER_PROXY;
+    IStarNFT COLLATERAL_VAULT;
 
     // A mapping of all of the auctions currently running.
     mapping(uint256 => IAuctionHouse.Auction) auctions;
+    mapping(uint256 => uint256) claimableBalance;
 
     uint256 private _auctionIdTracker;
 
@@ -42,11 +45,12 @@ contract AuctionHouse is Auth, IAuctionHouse {
     constructor(
         address weth_,
         address AUTHORITY_,
-        address bondController_,
+        address STAR_NFT_,
         address transferProxy_
     ) Auth(msg.sender, Authority(address(AUTHORITY_))) {
         weth = weth_;
         TRANSFER_PROXY = ITransferProxy(transferProxy_);
+        COLLATERAL_VAULT = IStarNFT(STAR_NFT_);
         timeBuffer = 15 * 60;
         // extend 15 minutes after every bid made in last 15 minutes
         minBidIncrementPercentage = 5;
@@ -62,7 +66,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
         uint256 tokenId,
         uint256 duration,
         uint256 reservePrice,
-        address[] calldata recipients,
+        uint256[] calldata lienIds,
         uint256[] calldata amounts,
         address initiator,
         uint256 initiatorFee
@@ -72,18 +76,17 @@ contract AuctionHouse is Auth, IAuctionHouse {
         }
         uint256 auctionId = _auctionIdTracker;
 
-        auctions[auctionId] = Auction({
-            tokenId: tokenId,
-            amount: 0,
-            duration: duration,
-            firstBidTime: 0,
-            reservePrice: reservePrice,
-            bidder: address(0),
-            recipients: recipients,
-            amounts: amounts,
-            initiator: initiator,
-            initiatorFee: initiatorFee
-        });
+        Auction storage newAuction = auctions[auctionId];
+        newAuction.tokenId = tokenId;
+        newAuction.currentBid = 0;
+        newAuction.duration = duration;
+        newAuction.firstBidTime = 0;
+        newAuction.reservePrice = reservePrice;
+        newAuction.bidder = address(0);
+        newAuction.recipients = lienIds;
+        newAuction.amounts = amounts;
+        newAuction.initiator = initiator;
+        newAuction.initiatorFee = initiatorFee;
 
         emit AuctionCreated(auctionId, tokenId, duration, reservePrice);
 
@@ -110,15 +113,15 @@ contract AuctionHouse is Auth, IAuctionHouse {
         );
         require(
             amount >=
-                auctions[auctionId].amount +
-                    ((auctions[auctionId].amount * minBidIncrementPercentage) /
-                        100),
+                auctions[auctionId].currentBid +
+                    ((auctions[auctionId].currentBid *
+                        minBidIncrementPercentage) / 100),
             "Must send more than last bid by minBidIncrementPercentage amount"
         );
 
         // If this is the first valid bid, we should set the starting time now.
         // If it's not, then we should refund the last bidder
-        uint256 vaultPayment = (amount - auctions[auctionId].amount);
+        uint256 vaultPayment = (amount - auctions[auctionId].currentBid);
 
         if (auctions[auctionId].firstBidTime == 0) {
             auctions[auctionId].firstBidTime = block.timestamp;
@@ -129,7 +132,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
 
         _handleIncomingPayment(auctionId, vaultPayment, address(msg.sender));
 
-        auctions[auctionId].amount = amount;
+        auctions[auctionId].currentBid = amount;
         auctions[auctionId].bidder = address(msg.sender);
 
         bool extended = false;
@@ -196,12 +199,20 @@ contract AuctionHouse is Auth, IAuctionHouse {
                 auctions[auctionId].firstBidTime + auctions[auctionId].duration,
             "Auction hasn't completed"
         );
-        winner = auctions[auctionId].bidder;
+        Auction storage auction = auctions[auctionId];
+        winner = auction.bidder;
+
+        for (uint256 i = 0; i < auction.recipients.length; ++i) {
+            if (getClaimableBalance(auction.recipients[i]) == uint256(0)) {
+                delete auctions[auctionId].recipients[i];
+            }
+        }
         emit AuctionEnded(
             auctionId,
-            auctions[auctionId].tokenId,
-            auctions[auctionId].bidder,
-            auctions[auctionId].amount
+            auction.tokenId,
+            auction.bidder,
+            auction.currentBid,
+            auction.recipients
         );
         delete auctions[auctionId];
     }
@@ -217,7 +228,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
     {
         //TODO: what is cancel flow so that its not gameable, must hit reserve? must not have hit reserve, or can cancel inside first 24 hours?
         require(
-            auctions[auctionId].amount < auctions[auctionId].reservePrice,
+            auctions[auctionId].currentBid < auctions[auctionId].reservePrice,
             "cancelAuction: Auction is at or above reserve"
         );
         //        _handleOutGoingPayment(canceledBy, auctions[auctionId].reservePrice);
@@ -246,7 +257,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
         IAuctionHouse.Auction memory auction = auctions[_auctionId];
         return (
             auction.tokenId,
-            auction.amount,
+            auction.currentBid,
             auction.duration,
             auction.firstBidTime,
             auction.reservePrice,
@@ -277,23 +288,66 @@ contract AuctionHouse is Auth, IAuctionHouse {
         );
         transferAmount -= initiatorPayment;
 
-        for (uint256 i = 0; i < auction.recipients.length; ++i) {
-            uint256 payment;
-            address recipient = auction.recipients[i];
+        if (auction.amounts.length > 0) {
+            for (
+                uint256 i = auction.recipients.length - auction.amounts.length;
+                i < auction.recipients.length;
+                ++i
+            ) {
+                uint256 payment;
+                uint256 recipient = auction.recipients[i];
 
-            if (transferAmount >= auction.amounts[i]) {
-                payment = auction.amounts[i];
-                transferAmount -= auction.amounts[i];
-                delete auction.recipients[i];
-                delete auction.amounts[i];
-            } else {
-                payment = transferAmount;
-                transferAmount = 0;
-                auction.amounts[i] -= payment;
+                if (transferAmount >= auction.amounts[i]) {
+                    payment = auction.amounts[i];
+                    transferAmount -= payment;
+                    //                    delete auction.recipients[i];
+                    delete auction.amounts[i];
+                } else {
+                    payment = transferAmount;
+                    transferAmount = 0;
+                    auction.amounts[i] -= payment;
+                }
+
+                //            TRANSFER_PROXY.tokenTransferFrom(weth, payee, recipient, payment);
+                if (payment > 0) {
+                    unchecked {
+                        claimableBalance[recipient] += payment;
+                    }
+                }
             }
-
-            TRANSFER_PROXY.tokenTransferFrom(weth, payee, recipient, payment);
+        } else {
+            TRANSFER_PROXY.tokenTransferFrom(
+                weth,
+                payee,
+                COLLATERAL_VAULT.ownerOf(auction.tokenId),
+                transferAmount
+            );
         }
+    }
+
+    function getClaimableBalance(uint256 _lienId)
+        public
+        view
+        returns (uint256)
+    {
+        return claimableBalance[_lienId];
+    }
+
+    function claimBalance(uint256 _lienId) external {
+        require(
+            msg.sender == COLLATERAL_VAULT.ownerOf(_lienId),
+            "only the owner can call this"
+        );
+        uint256 balance = getClaimableBalance(_lienId);
+        if (balance > 0) {
+            TRANSFER_PROXY.tokenTransferFrom(
+                weth,
+                address(this),
+                msg.sender,
+                balance
+            );
+        }
+        COLLATERAL_VAULT.burnLien(_lienId);
     }
 
     function _handleOutGoingPayment(address to, uint256 amount) internal {

@@ -6,14 +6,14 @@ interface IAuctionHouse {
         // ID for the ERC721 token
         uint256 tokenId;
         // The current highest bid amount
-        uint256 amount;
+        uint256 currentBid;
         // The length of time to run the auction for, after the first bid was made
         uint256 duration;
         // The time of the first bid
         uint256 firstBidTime;
         // The minimum price of the first bid
         uint256 reservePrice;
-        address[] recipients;
+        uint256[] recipients;
         uint256[] amounts;
         address bidder;
         address initiator;
@@ -52,7 +52,8 @@ interface IAuctionHouse {
         uint256 indexed auctionId,
         uint256 indexed tokenId,
         address winner,
-        uint256 amount
+        uint256 winningBid,
+        uint256[] recipients
     );
 
     event AuctionCanceled(uint256 indexed auctionId, uint256 indexed tokenId);
@@ -61,7 +62,7 @@ interface IAuctionHouse {
         uint256 tokenId,
         uint256 duration,
         uint256 reservePrice,
-        address[] memory vaults,
+        uint256[] memory vaults,
         uint256[] memory amounts,
         address initiator,
         uint256 initiatorFee
@@ -72,6 +73,11 @@ interface IAuctionHouse {
     function endAuction(uint256 auctionId) external returns (address);
 
     function cancelAuction(uint256 auctionId, address canceledBy) external;
+
+    function getClaimableBalance(uint256 _lienId)
+        external
+        view
+        returns (uint256);
 
     function getAuctionData(uint256 _auctionId)
         external
