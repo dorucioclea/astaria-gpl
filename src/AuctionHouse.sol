@@ -10,7 +10,7 @@ import {IAuctionHouse} from "./interfaces/IAuctionHouse.sol";
 import {ITransferProxy} from "./interfaces/ITransferProxy.sol";
 
 import "./interfaces/IWETH9.sol";
-import "../../../src/interfaces/IStarNFT.sol";
+import {ILienToken, ICollateralVault} from "../../../src/CollateralVault.sol";
 
 contract AuctionHouse is Auth, IAuctionHouse {
     // The minimum amount of time left in an auction after a new bid is created
@@ -23,7 +23,8 @@ contract AuctionHouse is Auth, IAuctionHouse {
     address weth;
 
     ITransferProxy TRANSFER_PROXY;
-    IStarNFT COLLATERAL_VAULT;
+    ILienToken LIEN_TOKEN;
+    ICollateralVault COLLATERAL_VAULT;
 
     // A mapping of all of the auctions currently running.
     mapping(uint256 => IAuctionHouse.Auction) auctions;
@@ -45,12 +46,14 @@ contract AuctionHouse is Auth, IAuctionHouse {
     constructor(
         address weth_,
         address AUTHORITY_,
-        address STAR_NFT_,
+        address COLLATERAL_VAULT_,
+        address LIEN_TOKEN_,
         address transferProxy_
     ) Auth(msg.sender, Authority(address(AUTHORITY_))) {
         weth = weth_;
         TRANSFER_PROXY = ITransferProxy(transferProxy_);
-        COLLATERAL_VAULT = IStarNFT(STAR_NFT_);
+        COLLATERAL_VAULT = ICollateralVault(COLLATERAL_VAULT_);
+        LIEN_TOKEN = ILienToken(LIEN_TOKEN_);
         timeBuffer = 15 * 60;
         // extend 15 minutes after every bid made in last 15 minutes
         minBidIncrementPercentage = 5;
@@ -65,32 +68,39 @@ contract AuctionHouse is Auth, IAuctionHouse {
     function createAuction(
         uint256 tokenId,
         uint256 duration,
-        uint256 reservePrice,
-        uint256[] calldata lienIds,
-        uint256[] calldata amounts,
+        //        uint256 reservePrice,
+        //        uint256[] calldata lienIds,
+        //        uint256[] calldata amounts,
         address initiator,
         uint256 initiatorFee
-    ) external requiresAuth returns (uint256) {
+    ) external requiresAuth returns (uint256, uint256) {
         unchecked {
             ++_auctionIdTracker;
         }
         uint256 auctionId = _auctionIdTracker;
+
+        (
+            uint256 reserve,
+            uint256[] memory amounts,
+            uint256[] memory lienIds
+        ) = LIEN_TOKEN.stopLiens(tokenId);
+        //        uint256 lienIds = LIEN_TOKEN.getLiens(tokenId);
 
         Auction storage newAuction = auctions[auctionId];
         newAuction.tokenId = tokenId;
         newAuction.currentBid = 0;
         newAuction.duration = duration;
         newAuction.firstBidTime = 0;
-        newAuction.reservePrice = reservePrice;
+        newAuction.reservePrice = reserve;
         newAuction.bidder = address(0);
         newAuction.recipients = lienIds;
         newAuction.amounts = amounts;
         newAuction.initiator = initiator;
         newAuction.initiatorFee = initiatorFee;
 
-        emit AuctionCreated(auctionId, tokenId, duration, reservePrice);
+        emit AuctionCreated(auctionId, tokenId, duration, reserve);
 
-        return auctionId;
+        return (auctionId, reserve);
     }
 
     /**
@@ -204,6 +214,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
 
         for (uint256 i = 0; i < auction.recipients.length; ++i) {
             if (getClaimableBalance(auction.recipients[i]) == uint256(0)) {
+                _processLienPayout(auction.recipients[i]);
                 delete auctions[auctionId].recipients[i];
             }
         }
@@ -214,6 +225,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
             auction.currentBid,
             auction.recipients
         );
+        LIEN_TOKEN.removeLiens(auction.tokenId);
         delete auctions[auctionId];
     }
 
@@ -226,12 +238,10 @@ contract AuctionHouse is Auth, IAuctionHouse {
         auctionExists(auctionId)
         requiresAuth
     {
-        //TODO: what is cancel flow so that its not gameable, must hit reserve? must not have hit reserve, or can cancel inside first 24 hours?
         require(
             auctions[auctionId].currentBid < auctions[auctionId].reservePrice,
             "cancelAuction: Auction is at or above reserve"
         );
-        //        _handleOutGoingPayment(canceledBy, auctions[auctionId].reservePrice);
         if (auctions[auctionId].bidder == address(0)) {
             _handleIncomingPayment(
                 auctionId,
@@ -308,7 +318,6 @@ contract AuctionHouse is Auth, IAuctionHouse {
                     auction.amounts[i] -= payment;
                 }
 
-                //            TRANSFER_PROXY.tokenTransferFrom(weth, payee, recipient, payment);
                 if (payment > 0) {
                     unchecked {
                         claimableBalance[recipient] += payment;
@@ -333,12 +342,8 @@ contract AuctionHouse is Auth, IAuctionHouse {
         return claimableBalance[_lienId];
     }
 
-    function claimBalance(uint256 _lienId) external {
-        require(
-            msg.sender == COLLATERAL_VAULT.ownerOf(_lienId),
-            "only the owner can call this"
-        );
-        uint256 balance = getClaimableBalance(_lienId);
+    function _processLienPayout(uint256 lienId) internal {
+        uint256 balance = getClaimableBalance(lienId);
         if (balance > 0) {
             TRANSFER_PROXY.tokenTransferFrom(
                 weth,
@@ -347,18 +352,13 @@ contract AuctionHouse is Auth, IAuctionHouse {
                 balance
             );
         }
-        COLLATERAL_VAULT.burnLien(_lienId);
+        delete claimableBalance[lienId];
     }
 
     function _handleOutGoingPayment(address to, uint256 amount) internal {
         //        weth.transferFrom(address(msg.sender), to, amount);
         TRANSFER_PROXY.tokenTransferFrom(weth, address(msg.sender), to, amount);
     }
-
-    //    function _handleCancelPayment(address from, uint256 amount) internal {
-    //        //        weth.transferFrom(from, address(bondController), amount);
-    //        TRANSFER_PROXY.tokenTransferFrom(weth, from, bondController, amount);
-    //    }
 
     function _cancelAuction(uint256 auctionId) internal {
         emit AuctionCanceled(auctionId, auctions[auctionId].tokenId);

@@ -8,7 +8,7 @@ import {ERC20} from "solmate/tokens/ERC20.sol";
 
 /// @notice Minimal ERC4626 tokenized Vault implementation.
 /// @author Solmate (https://github.com/Rari-Capital/solmate/blob/main/src/mixins/ERC4626.sol)
-contract Base is Clone {
+abstract contract Base is Clone {
     function COLLATERAL_VAULT() public pure returns (address) {
         return _getArgAddress(0);
     }
@@ -34,7 +34,11 @@ contract Base is Clone {
     }
 
     function appraiser() public pure returns (address) {
-        return _getArgAddress(142);
+        return _getArgAddress(156);
+    }
+
+    function AUCTION_HOUSE() public pure returns (address) {
+        return _getArgAddress(188);
     }
 
     function decimals() public pure returns (uint8) {

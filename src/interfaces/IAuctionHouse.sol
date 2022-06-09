@@ -61,12 +61,9 @@ interface IAuctionHouse {
     function createAuction(
         uint256 tokenId,
         uint256 duration,
-        uint256 reservePrice,
-        uint256[] memory vaults,
-        uint256[] memory amounts,
         address initiator,
         uint256 initiatorFee
-    ) external returns (uint256);
+    ) external returns (uint256, uint256);
 
     function createBid(uint256 auctionId, uint256 amount) external;
 
