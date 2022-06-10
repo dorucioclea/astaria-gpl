@@ -30,13 +30,11 @@ contract AuctionHouse is Auth, IAuctionHouse {
     // A mapping of all of the auctions currently running.
     mapping(uint256 => IAuctionHouse.Auction) auctions;
 
-    uint256 private _auctionIdTracker;
-
     /**
      * @notice Require that the specified auction exists
      */
-    modifier auctionExists(uint256 auctionId) {
-        require(_auctionExists(auctionId), "Auction doesn't exist");
+    modifier activeAuction(uint256 auctionId) {
+        require(auctionExists(auctionId), "Auction doesn't exist");
         _;
     }
 
@@ -73,15 +71,15 @@ contract AuctionHouse is Auth, IAuctionHouse {
         //        uint256[] calldata amounts,
         address initiator,
         uint256 initiatorFee
-    ) external requiresAuth returns (uint256, uint256) {
+    ) external requiresAuth returns (uint256 reserve) {
         //        unchecked {
         //            ++_auctionIdTracker;
         //        }
         //        uint256 auctionId = _auctionIdTracker;
-
+        uint256[] memory amounts;
         (
-            uint256 reserve,
-            uint256[] memory amounts, //            uint256[] memory lienIds
+            reserve,
+            amounts, //            uint256[] memory lienIds
 
         ) = LIEN_TOKEN.stopLiens(tokenId);
 
@@ -96,8 +94,6 @@ contract AuctionHouse is Auth, IAuctionHouse {
         newAuction.initiatorFee = initiatorFee;
 
         emit AuctionCreated(tokenId, duration, reserve);
-
-        return (tokenId, reserve);
     }
 
     /**
@@ -106,49 +102,49 @@ contract AuctionHouse is Auth, IAuctionHouse {
      * If the auction is run in native ETH, the ETH is wrapped so it can be identically to other
      * auction currencies in this contract.
      */
-    function createBid(uint256 auctionId, uint256 amount)
+    function createBid(uint256 tokenId, uint256 amount)
         external
         override
-        auctionExists(auctionId)
+        activeAuction(tokenId)
     {
-        address lastBidder = auctions[auctionId].bidder;
+        address lastBidder = auctions[tokenId].bidder;
         require(
-            auctions[auctionId].firstBidTime == 0 ||
+            auctions[tokenId].firstBidTime == 0 ||
                 block.timestamp <
-                auctions[auctionId].firstBidTime + auctions[auctionId].duration,
+                auctions[tokenId].firstBidTime + auctions[tokenId].duration,
             "Auction expired"
         );
         require(
             amount >=
-                auctions[auctionId].currentBid +
-                    ((auctions[auctionId].currentBid *
+                auctions[tokenId].currentBid +
+                    ((auctions[tokenId].currentBid *
                         minBidIncrementPercentage) / 100),
             "Must send more than last bid by minBidIncrementPercentage amount"
         );
 
         // If this is the first valid bid, we should set the starting time now.
         // If it's not, then we should refund the last bidder
-        uint256 vaultPayment = (amount - auctions[auctionId].currentBid);
+        uint256 vaultPayment = (amount - auctions[tokenId].currentBid);
 
-        if (auctions[auctionId].firstBidTime == 0) {
-            auctions[auctionId].firstBidTime = block.timestamp;
+        if (auctions[tokenId].firstBidTime == 0) {
+            auctions[tokenId].firstBidTime = block.timestamp;
         } else if (lastBidder != address(0)) {
             uint256 lastBidderRefund = amount - vaultPayment;
             _handleOutGoingPayment(lastBidder, lastBidderRefund);
         }
 
-        _handleIncomingPayment(auctionId, vaultPayment, address(msg.sender));
+        _handleIncomingPayment(tokenId, vaultPayment, address(msg.sender));
 
-        auctions[auctionId].currentBid = amount;
-        auctions[auctionId].bidder = address(msg.sender);
+        auctions[tokenId].currentBid = amount;
+        auctions[tokenId].bidder = address(msg.sender);
 
         bool extended = false;
         // at this point we know that the timestamp is less than start + duration (since the auction would be over, otherwise)
         // we want to know by how much the timestamp is less than start + duration
         // if the difference is less than the timeBuffer, increase the duration by the timeBuffer
         if (
-            auctions[auctionId].firstBidTime +
-                auctions[auctionId].duration -
+            auctions[tokenId].firstBidTime +
+                auctions[tokenId].duration -
                 block.timestamp <
             timeBuffer
         ) {
@@ -157,18 +153,18 @@ contract AuctionHouse is Auth, IAuctionHouse {
             // uint256 timeRemaining = expectedEnd.sub(block.timestamp);
             // uint256 timeToAdd = timeBuffer.sub(timeRemaining);
             // uint256 newDuration = auctions[auctionId].duration.add(timeToAdd);
-            uint256 oldDuration = auctions[auctionId].duration;
-            auctions[auctionId].duration =
+            uint256 oldDuration = auctions[tokenId].duration;
+            auctions[tokenId].duration =
                 oldDuration +
                 (timeBuffer -
-                    auctions[auctionId].firstBidTime +
+                    auctions[tokenId].firstBidTime +
                     oldDuration -
                     block.timestamp);
             extended = true;
         }
 
         emit AuctionBid(
-            auctionId,
+            tokenId,
             msg.sender,
             amount,
             lastBidder == address(0), // firstBid boolean
@@ -176,10 +172,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
         );
 
         if (extended) {
-            emit AuctionDurationExtended(
-                auctionId,
-                auctions[auctionId].duration
-            );
+            emit AuctionDurationExtended(tokenId, auctions[tokenId].duration);
         }
     }
 
@@ -192,7 +185,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
         external
         override
         requiresAuth
-        auctionExists(auctionId)
+        activeAuction(auctionId)
         returns (address winner)
     {
         require(
@@ -226,7 +219,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
      */
     function cancelAuction(uint256 auctionId, address canceledBy)
         external
-        auctionExists(auctionId)
+        activeAuction(auctionId)
         requiresAuth
     {
         require(
@@ -247,7 +240,6 @@ contract AuctionHouse is Auth, IAuctionHouse {
         public
         view
         returns (
-            uint256 tokenId,
             uint256 amount,
             uint256 duration,
             uint256 firstBidTime,
@@ -257,7 +249,6 @@ contract AuctionHouse is Auth, IAuctionHouse {
     {
         IAuctionHouse.Auction memory auction = auctions[_auctionId];
         return (
-            _auctionId,
             auction.currentBid,
             auction.duration,
             auction.firstBidTime,
@@ -339,7 +330,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
         delete auctions[tokenId];
     }
 
-    function _auctionExists(uint256 tokenId) internal view returns (bool) {
+    function auctionExists(uint256 tokenId) public view returns (bool) {
         return auctions[tokenId].initiator != address(0);
     }
 }

@@ -3,8 +3,6 @@ pragma experimental ABIEncoderV2;
 
 interface IAuctionHouse {
     struct Auction {
-        // ID for the ERC721 token
-        //        uint256 tokenId;
         // The current highest bid amount
         uint256 currentBid;
         // The length of time to run the auction for, after the first bid was made
@@ -55,19 +53,20 @@ interface IAuctionHouse {
         uint256 duration,
         address initiator,
         uint256 initiatorFee
-    ) external returns (uint256, uint256);
+    ) external returns (uint256);
 
-    function createBid(uint256 auctionId, uint256 amount) external;
+    function createBid(uint256 tokenId, uint256 amount) external;
 
-    function endAuction(uint256 auctionId) external returns (address);
+    function endAuction(uint256 tokenId) external returns (address);
 
-    function cancelAuction(uint256 auctionId, address canceledBy) external;
+    function cancelAuction(uint256 tokenId, address canceledBy) external;
 
-    function getAuctionData(uint256 _auctionId)
+    function auctionExists(uint256 tokenId) external returns (bool);
+
+    function getAuctionData(uint256 tokenId)
         external
         view
         returns (
-            uint256 tokenId,
             uint256 amount,
             uint256 duration,
             uint256 firstBidTime,
