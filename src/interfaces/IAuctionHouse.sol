@@ -4,7 +4,7 @@ pragma experimental ABIEncoderV2;
 interface IAuctionHouse {
     struct Auction {
         // ID for the ERC721 token
-        uint256 tokenId;
+        //        uint256 tokenId;
         // The current highest bid amount
         uint256 currentBid;
         // The length of time to run the auction for, after the first bid was made
@@ -21,20 +21,17 @@ interface IAuctionHouse {
     }
 
     event AuctionCreated(
-        uint256 indexed auctionId,
         uint256 indexed tokenId,
         uint256 duration,
         uint256 reservePrice
     );
 
     event AuctionReservePriceUpdated(
-        uint256 indexed auctionId,
         uint256 indexed tokenId,
         uint256 reservePrice
     );
 
     event AuctionBid(
-        uint256 indexed auctionId,
         uint256 indexed tokenId,
         address sender,
         uint256 value,
@@ -42,14 +39,9 @@ interface IAuctionHouse {
         bool extended
     );
 
-    event AuctionDurationExtended(
-        uint256 indexed auctionId,
-        uint256 indexed tokenId,
-        uint256 duration
-    );
+    event AuctionDurationExtended(uint256 indexed tokenId, uint256 duration);
 
     event AuctionEnded(
-        uint256 indexed auctionId,
         uint256 indexed tokenId,
         address winner,
         uint256 winningBid,
@@ -70,11 +62,6 @@ interface IAuctionHouse {
     function endAuction(uint256 auctionId) external returns (address);
 
     function cancelAuction(uint256 auctionId, address canceledBy) external;
-
-    function getClaimableBalance(uint256 _lienId)
-        external
-        view
-        returns (uint256);
 
     function getAuctionData(uint256 _auctionId)
         external

@@ -10,7 +10,8 @@ import {IAuctionHouse} from "./interfaces/IAuctionHouse.sol";
 import {ITransferProxy} from "./interfaces/ITransferProxy.sol";
 
 import "./interfaces/IWETH9.sol";
-import {ILienToken, ICollateralVault} from "../../../src/CollateralVault.sol";
+import {ILienToken} from "../../../src/interfaces/ILienToken.sol";
+import {ICollateralVault} from "../../../src/interfaces/ICollateralVault.sol";
 
 contract AuctionHouse is Auth, IAuctionHouse {
     // The minimum amount of time left in an auction after a new bid is created
@@ -28,7 +29,6 @@ contract AuctionHouse is Auth, IAuctionHouse {
 
     // A mapping of all of the auctions currently running.
     mapping(uint256 => IAuctionHouse.Auction) auctions;
-    mapping(uint256 => uint256) claimableBalance;
 
     uint256 private _auctionIdTracker;
 
@@ -74,33 +74,30 @@ contract AuctionHouse is Auth, IAuctionHouse {
         address initiator,
         uint256 initiatorFee
     ) external requiresAuth returns (uint256, uint256) {
-        unchecked {
-            ++_auctionIdTracker;
-        }
-        uint256 auctionId = _auctionIdTracker;
+        //        unchecked {
+        //            ++_auctionIdTracker;
+        //        }
+        //        uint256 auctionId = _auctionIdTracker;
 
         (
             uint256 reserve,
-            uint256[] memory amounts,
-            uint256[] memory lienIds
-        ) = LIEN_TOKEN.stopLiens(tokenId);
-        //        uint256 lienIds = LIEN_TOKEN.getLiens(tokenId);
+            uint256[] memory amounts, //            uint256[] memory lienIds
 
-        Auction storage newAuction = auctions[auctionId];
-        newAuction.tokenId = tokenId;
+        ) = LIEN_TOKEN.stopLiens(tokenId);
+
+        Auction storage newAuction = auctions[tokenId];
         newAuction.currentBid = 0;
         newAuction.duration = duration;
         newAuction.firstBidTime = 0;
         newAuction.reservePrice = reserve;
         newAuction.bidder = address(0);
-        newAuction.recipients = lienIds;
         newAuction.amounts = amounts;
         newAuction.initiator = initiator;
         newAuction.initiatorFee = initiatorFee;
 
-        emit AuctionCreated(auctionId, tokenId, duration, reserve);
+        emit AuctionCreated(tokenId, duration, reserve);
 
-        return (auctionId, reserve);
+        return (tokenId, reserve);
     }
 
     /**
@@ -172,7 +169,6 @@ contract AuctionHouse is Auth, IAuctionHouse {
 
         emit AuctionBid(
             auctionId,
-            auctions[auctionId].tokenId,
             msg.sender,
             amount,
             lastBidder == address(0), // firstBid boolean
@@ -182,7 +178,6 @@ contract AuctionHouse is Auth, IAuctionHouse {
         if (extended) {
             emit AuctionDurationExtended(
                 auctionId,
-                auctions[auctionId].tokenId,
                 auctions[auctionId].duration
             );
         }
@@ -212,20 +207,16 @@ contract AuctionHouse is Auth, IAuctionHouse {
         Auction storage auction = auctions[auctionId];
         winner = auction.bidder;
 
-        for (uint256 i = 0; i < auction.recipients.length; ++i) {
-            if (getClaimableBalance(auction.recipients[i]) == uint256(0)) {
-                _processLienPayout(auction.recipients[i]);
-                delete auctions[auctionId].recipients[i];
-            }
-        }
+        //        for (uint256 i = 0; i < auction.recipients.length; ++i) {
+        //            _processLienPayout(auction.recipients[i]);
+        //        }
         emit AuctionEnded(
             auctionId,
-            auction.tokenId,
             auction.bidder,
             auction.currentBid,
             auction.recipients
         );
-        LIEN_TOKEN.removeLiens(auction.tokenId);
+        LIEN_TOKEN.removeLiens(auctionId);
         delete auctions[auctionId];
     }
 
@@ -266,7 +257,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
     {
         IAuctionHouse.Auction memory auction = auctions[_auctionId];
         return (
-            auction.tokenId,
+            _auctionId,
             auction.currentBid,
             auction.duration,
             auction.firstBidTime,
@@ -280,13 +271,13 @@ contract AuctionHouse is Auth, IAuctionHouse {
      * If the currency is ETH (0x0), attempt to wrap the amount as WETH
      */
     function _handleIncomingPayment(
-        uint256 auctionId,
+        uint256 tokenId,
         uint256 transferAmount,
         address payee
     ) internal {
         require(transferAmount > uint256(0), "cannot send nothing");
 
-        Auction storage auction = auctions[auctionId];
+        Auction storage auction = auctions[tokenId];
 
         uint256 initiatorPayment = (transferAmount * auction.initiatorFee) /
             100;
@@ -299,13 +290,14 @@ contract AuctionHouse is Auth, IAuctionHouse {
         transferAmount -= initiatorPayment;
 
         if (auction.amounts.length > 0) {
+            uint256[] memory liens = LIEN_TOKEN.getLiens(tokenId);
             for (
-                uint256 i = auction.recipients.length - auction.amounts.length;
-                i < auction.recipients.length;
+                uint256 i = liens.length - auction.amounts.length;
+                i < liens.length;
                 ++i
             ) {
                 uint256 payment;
-                uint256 recipient = auction.recipients[i];
+                uint256 recipient = liens[i];
 
                 if (transferAmount >= auction.amounts[i]) {
                     payment = auction.amounts[i];
@@ -319,40 +311,22 @@ contract AuctionHouse is Auth, IAuctionHouse {
                 }
 
                 if (payment > 0) {
-                    unchecked {
-                        claimableBalance[recipient] += payment;
-                    }
+                    TRANSFER_PROXY.tokenTransferFrom(
+                        weth,
+                        payee,
+                        LIEN_TOKEN.ownerOf(recipient),
+                        payment
+                    );
                 }
             }
         } else {
             TRANSFER_PROXY.tokenTransferFrom(
                 weth,
                 payee,
-                COLLATERAL_VAULT.ownerOf(auction.tokenId),
+                COLLATERAL_VAULT.ownerOf(tokenId),
                 transferAmount
             );
         }
-    }
-
-    function getClaimableBalance(uint256 _lienId)
-        public
-        view
-        returns (uint256)
-    {
-        return claimableBalance[_lienId];
-    }
-
-    function _processLienPayout(uint256 lienId) internal {
-        uint256 balance = getClaimableBalance(lienId);
-        if (balance > 0) {
-            TRANSFER_PROXY.tokenTransferFrom(
-                weth,
-                address(this),
-                msg.sender,
-                balance
-            );
-        }
-        delete claimableBalance[lienId];
     }
 
     function _handleOutGoingPayment(address to, uint256 amount) internal {
@@ -360,12 +334,12 @@ contract AuctionHouse is Auth, IAuctionHouse {
         TRANSFER_PROXY.tokenTransferFrom(weth, address(msg.sender), to, amount);
     }
 
-    function _cancelAuction(uint256 auctionId) internal {
-        emit AuctionCanceled(auctionId, auctions[auctionId].tokenId);
-        delete auctions[auctionId];
+    function _cancelAuction(uint256 tokenId) internal {
+        emit AuctionCanceled(tokenId, tokenId);
+        delete auctions[tokenId];
     }
 
-    function _auctionExists(uint256 auctionId) internal view returns (bool) {
-        return auctions[auctionId].tokenId != uint256(0);
+    function _auctionExists(uint256 tokenId) internal view returns (bool) {
+        return auctions[tokenId].initiator != address(0);
     }
 }
