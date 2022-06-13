@@ -46,7 +46,7 @@ interface IAuctionHouse {
         uint256[] recipients
     );
 
-    event AuctionCanceled(uint256 indexed auctionId, uint256 indexed tokenId);
+    event AuctionCanceled(uint256 indexed tokenId);
 
     function createAuction(
         uint256 tokenId,

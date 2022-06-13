@@ -326,7 +326,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
     }
 
     function _cancelAuction(uint256 tokenId) internal {
-        emit AuctionCanceled(tokenId, tokenId);
+        emit AuctionCanceled(tokenId);
         delete auctions[tokenId];
     }
 
