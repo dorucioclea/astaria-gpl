@@ -19,6 +19,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
 
     // The minimum percentage difference between the last bid amount and the current bid.
     uint8 minBidIncrementPercentage;
+    uint8 maxActiveAuctionsPerUnderlying;
 
     // / The address of the WETH contract, so that any ETH transferred can be handled as an ERC-20
     address weth;
@@ -27,14 +28,32 @@ contract AuctionHouse is Auth, IAuctionHouse {
     ILienToken LIEN_TOKEN;
     ICollateralVault COLLATERAL_VAULT;
 
+    // tokenContract(of the collection) => list of auctions
+    mapping(address => uint256[]) auctionQueue;
+
     // A mapping of all of the auctions currently running.
     mapping(uint256 => IAuctionHouse.Auction) auctions;
 
     /**
      * @notice Require that the specified auction exists
      */
-    modifier activeAuction(uint256 auctionId) {
+    modifier auctionQueued(uint256 auctionId, bool auctionClose) {
         require(auctionExists(auctionId), "Auction doesn't exist");
+        (address underlying, ) = COLLATERAL_VAULT.getUnderlying(auctionId);
+        uint256 maxActive = auctionQueue[underlying].length >
+            uint256(maxActiveAuctionsPerUnderlying)
+            ? uint256(maxActiveAuctionsPerUnderlying)
+            : auctionQueue[underlying].length;
+        bool found = false;
+        for (uint256 i = 0; i < maxActive; ++i) {
+            if (auctionQueue[underlying][i] == auctionId) {
+                found = true;
+                if (auctionClose) {
+                    delete auctionQueue[underlying][i];
+                }
+            }
+        }
+        require(found, "Auction has not started");
         _;
     }
 
@@ -56,6 +75,14 @@ contract AuctionHouse is Auth, IAuctionHouse {
         // extend 15 minutes after every bid made in last 15 minutes
         minBidIncrementPercentage = 5;
         // 5%
+        maxActiveAuctionsPerUnderlying = 3;
+    }
+
+    function setMaxActiveAuctionsPerUnderlying(uint8 newMax)
+        external
+        requiresAuth
+    {
+        maxActiveAuctionsPerUnderlying = newMax;
     }
 
     /**
@@ -93,6 +120,10 @@ contract AuctionHouse is Auth, IAuctionHouse {
         newAuction.initiator = initiator;
         newAuction.initiatorFee = initiatorFee;
 
+        (address underlying, ) = COLLATERAL_VAULT.getUnderlying(tokenId);
+
+        auctionQueue[underlying].push(tokenId);
+
         emit AuctionCreated(tokenId, duration, reserve);
     }
 
@@ -105,7 +136,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
     function createBid(uint256 tokenId, uint256 amount)
         external
         override
-        activeAuction(tokenId)
+        auctionQueued(tokenId, false)
     {
         address lastBidder = auctions[tokenId].bidder;
         require(
@@ -185,7 +216,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
         external
         override
         requiresAuth
-        activeAuction(auctionId)
+        auctionQueued(auctionId, true)
         returns (address winner)
     {
         require(
@@ -219,7 +250,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
      */
     function cancelAuction(uint256 auctionId, address canceledBy)
         external
-        activeAuction(auctionId)
+        auctionQueued(auctionId, true)
         requiresAuth
     {
         require(
