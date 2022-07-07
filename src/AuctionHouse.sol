@@ -93,29 +93,15 @@ contract AuctionHouse is Auth, IAuctionHouse {
     function createAuction(
         uint256 tokenId,
         uint256 duration,
-        //        uint256 reservePrice,
-        //        uint256[] calldata lienIds,
-        //        uint256[] calldata amounts,
         address initiator,
         uint256 initiatorFee
     ) external requiresAuth returns (uint256 reserve) {
-        //        unchecked {
-        //            ++_auctionIdTracker;
-        //        }
-        //        uint256 auctionId = _auctionIdTracker;
         uint256[] memory amounts;
-        (
-            reserve,
-            amounts, //            uint256[] memory lienIds
-
-        ) = LIEN_TOKEN.stopLiens(tokenId);
+        (reserve, amounts, ) = LIEN_TOKEN.stopLiens(tokenId);
 
         Auction storage newAuction = auctions[tokenId];
-        newAuction.currentBid = 0;
-        newAuction.duration = duration;
-        newAuction.firstBidTime = 0;
+        newAuction.duration = uint64(duration);
         newAuction.reservePrice = reserve;
-        newAuction.bidder = address(0);
         newAuction.amounts = amounts;
         newAuction.initiator = initiator;
         newAuction.initiatorFee = initiatorFee;
@@ -158,7 +144,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
         uint256 vaultPayment = (amount - auctions[tokenId].currentBid);
 
         if (auctions[tokenId].firstBidTime == 0) {
-            auctions[tokenId].firstBidTime = block.timestamp;
+            auctions[tokenId].firstBidTime = uint64(block.timestamp);
         } else if (lastBidder != address(0)) {
             uint256 lastBidderRefund = amount - vaultPayment;
             _handleOutGoingPayment(lastBidder, lastBidderRefund);
@@ -185,12 +171,13 @@ contract AuctionHouse is Auth, IAuctionHouse {
             // uint256 timeToAdd = timeBuffer.sub(timeRemaining);
             // uint256 newDuration = auctions[auctionId].duration.add(timeToAdd);
             uint256 oldDuration = auctions[tokenId].duration;
-            auctions[tokenId].duration =
+            auctions[tokenId].duration = uint64(
                 oldDuration +
-                (timeBuffer -
-                    auctions[tokenId].firstBidTime +
-                    oldDuration -
-                    block.timestamp);
+                    (timeBuffer -
+                        auctions[tokenId].firstBidTime +
+                        oldDuration -
+                        block.timestamp)
+            );
             extended = true;
         }
 
@@ -231,9 +218,6 @@ contract AuctionHouse is Auth, IAuctionHouse {
         Auction storage auction = auctions[auctionId];
         winner = auction.bidder;
 
-        //        for (uint256 i = 0; i < auction.recipients.length; ++i) {
-        //            _processLienPayout(auction.recipients[i]);
-        //        }
         emit AuctionEnded(
             auctionId,
             auction.bidder,
@@ -352,7 +336,6 @@ contract AuctionHouse is Auth, IAuctionHouse {
     }
 
     function _handleOutGoingPayment(address to, uint256 amount) internal {
-        //        weth.transferFrom(address(msg.sender), to, amount);
         TRANSFER_PROXY.tokenTransferFrom(weth, address(msg.sender), to, amount);
     }
 

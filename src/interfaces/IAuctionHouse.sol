@@ -6,13 +6,13 @@ interface IAuctionHouse {
         // The current highest bid amount
         uint256 currentBid;
         // The length of time to run the auction for, after the first bid was made
-        uint256 duration;
+        uint64 duration;
         // The time of the first bid
-        uint256 firstBidTime;
-        // The minimum price of the first bid
+        uint64 firstBidTime;
         uint256 reservePrice;
         uint256[] recipients;
         uint256[] amounts;
+        address token;
         address bidder;
         address initiator;
         uint256 initiatorFee;

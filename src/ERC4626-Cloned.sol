@@ -41,6 +41,10 @@ abstract contract Base is Clone {
         return _getArgAddress(188);
     }
 
+    function BROKER_TYPE() public pure returns (uint256) {
+        return _getArgUint256(220);
+    }
+
     function decimals() public pure returns (uint8) {
         return 18;
     }
