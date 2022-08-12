@@ -45,6 +45,14 @@ abstract contract Base is Clone {
         return _getArgUint256(220);
     }
 
+    function start()  public pure returns (uint256) {
+        return _getArgUint256(252);
+    }
+
+    function epoch_length() public pure returns (uint256) {
+        return _getArgUint256(284);
+    }
+
     function decimals() public pure returns (uint8) {
         return 18;
     }
@@ -425,10 +433,6 @@ abstract contract ERC4626Cloned is ERC20Cloned {
     {
         return convertToAssets(shares);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                     DEPOSIT/WITHDRAWAL LIMIT LOGIC
-    //////////////////////////////////////////////////////////////*/
 
     function maxDeposit(address) public view virtual returns (uint256) {
         return type(uint256).max;
