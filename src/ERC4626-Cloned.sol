@@ -48,8 +48,13 @@ abstract contract VaultBase is Base {
     }
 
     function EPOCH_LENGTH() public view returns (uint256) {
-        return _getArgUint256(120);
+        return _getArgUint256(132);
     }
+
+    function BROKER_TYPE() public view returns (uint256) {
+        return _getArgUint256(164);
+    }
+
 
 }
 
