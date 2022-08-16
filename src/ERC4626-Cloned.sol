@@ -31,7 +31,7 @@ abstract contract Base is Clone, IBase {
 abstract contract VaultBase is Base {
 
 
-    function COLLATERAL_VAULT() public view returns (address) {
+    function ESCROW_TOKEN() public view returns (address) {
         return _getArgAddress(40);
     }
 

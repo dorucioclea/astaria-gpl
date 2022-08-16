@@ -12,7 +12,7 @@ import {ITransferProxy} from "./interfaces/ITransferProxy.sol";
 
 import "./interfaces/IWETH9.sol";
 import {ILienToken} from "../../../src/interfaces/ILienToken.sol";
-import {ICollateralVault} from "../../../src/interfaces/ICollateralVault.sol";
+import {IEscrowToken} from "../../../src/interfaces/IEscrowToken.sol";
 
 contract AuctionHouse is Auth, IAuctionHouse {
     // The minimum amount of time left in an auction after a new bid is created
@@ -27,7 +27,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
 
     ITransferProxy TRANSFER_PROXY;
     ILienToken LIEN_TOKEN;
-    ICollateralVault COLLATERAL_VAULT;
+    IEscrowToken ESCROW_TOKEN;
 
     // tokenContract(of the collection) => list of auctions
     mapping(address => uint256[]) auctionQueue;
@@ -40,7 +40,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
      */
     modifier auctionQueued(uint256 auctionId, bool auctionClose) {
         require(auctionExists(auctionId), "Auction doesn't exist");
-        (address underlying,) = COLLATERAL_VAULT.getUnderlying(auctionId);
+        (address underlying,) = ESCROW_TOKEN.getUnderlying(auctionId);
         uint256 maxActive =
             auctionQueue[underlying].length > uint256(maxActiveAuctionsPerUnderlying)
             ? uint256(maxActiveAuctionsPerUnderlying)
@@ -64,7 +64,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
     constructor(
         address weth_,
         address AUTHORITY_,
-        address COLLATERAL_VAULT_,
+        address ESCROW_TOKEN_,
         address LIEN_TOKEN_,
         address transferProxy_
     )
@@ -72,7 +72,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
     {
         weth = weth_;
         TRANSFER_PROXY = ITransferProxy(transferProxy_);
-        COLLATERAL_VAULT = ICollateralVault(COLLATERAL_VAULT_);
+        ESCROW_TOKEN = IEscrowToken(ESCROW_TOKEN_);
         LIEN_TOKEN = ILienToken(LIEN_TOKEN_);
         timeBuffer = 15 * 60;
         // extend 15 minutes after every bid made in last 15 minutes
@@ -113,7 +113,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
         newAuction.initiator = initiator;
         newAuction.initiatorFee = initiatorFee;
 
-        (address underlying,) = COLLATERAL_VAULT.getUnderlying(tokenId);
+        (address underlying,) = ESCROW_TOKEN.getUnderlying(tokenId);
 
         auctionQueue[underlying].push(tokenId);
 
@@ -316,7 +316,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
             }
         } else {
             TRANSFER_PROXY.tokenTransferFrom(
-                weth, payee, COLLATERAL_VAULT.ownerOf(tokenId), transferAmount
+                weth, payee, ESCROW_TOKEN.ownerOf(tokenId), transferAmount
             );
         }
     }
