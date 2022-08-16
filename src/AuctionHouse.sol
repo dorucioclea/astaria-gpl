@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 pragma solidity ^0.8.13;
+
 pragma experimental ABIEncoderV2;
 
 import {Auth, Authority} from "solmate/auth/Auth.sol";
@@ -39,9 +40,9 @@ contract AuctionHouse is Auth, IAuctionHouse {
      */
     modifier auctionQueued(uint256 auctionId, bool auctionClose) {
         require(auctionExists(auctionId), "Auction doesn't exist");
-        (address underlying, ) = COLLATERAL_VAULT.getUnderlying(auctionId);
-        uint256 maxActive = auctionQueue[underlying].length >
-            uint256(maxActiveAuctionsPerUnderlying)
+        (address underlying,) = COLLATERAL_VAULT.getUnderlying(auctionId);
+        uint256 maxActive =
+            auctionQueue[underlying].length > uint256(maxActiveAuctionsPerUnderlying)
             ? uint256(maxActiveAuctionsPerUnderlying)
             : auctionQueue[underlying].length;
         bool found = false;
@@ -66,7 +67,9 @@ contract AuctionHouse is Auth, IAuctionHouse {
         address COLLATERAL_VAULT_,
         address LIEN_TOKEN_,
         address transferProxy_
-    ) Auth(msg.sender, Authority(address(AUTHORITY_))) {
+    )
+        Auth(msg.sender, Authority(address(AUTHORITY_)))
+    {
         weth = weth_;
         TRANSFER_PROXY = ITransferProxy(transferProxy_);
         COLLATERAL_VAULT = ICollateralVault(COLLATERAL_VAULT_);
@@ -95,9 +98,13 @@ contract AuctionHouse is Auth, IAuctionHouse {
         uint256 duration,
         address initiator,
         uint256 initiatorFee
-    ) external requiresAuth returns (uint256 reserve) {
+    )
+        external
+        requiresAuth
+        returns (uint256 reserve)
+    {
         uint256[] memory amounts;
-        (reserve, amounts, ) = LIEN_TOKEN.stopLiens(tokenId);
+        (reserve, amounts,) = LIEN_TOKEN.stopLiens(tokenId);
 
         Auction storage newAuction = auctions[tokenId];
         newAuction.duration = uint64(duration);
@@ -106,7 +113,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
         newAuction.initiator = initiator;
         newAuction.initiatorFee = initiatorFee;
 
-        (address underlying, ) = COLLATERAL_VAULT.getUnderlying(tokenId);
+        (address underlying,) = COLLATERAL_VAULT.getUnderlying(tokenId);
 
         auctionQueue[underlying].push(tokenId);
 
@@ -126,16 +133,14 @@ contract AuctionHouse is Auth, IAuctionHouse {
     {
         address lastBidder = auctions[tokenId].bidder;
         require(
-            auctions[tokenId].firstBidTime == 0 ||
-                block.timestamp <
-                auctions[tokenId].firstBidTime + auctions[tokenId].duration,
+            auctions[tokenId].firstBidTime == 0
+                || block.timestamp < auctions[tokenId].firstBidTime + auctions[tokenId].duration,
             "Auction expired"
         );
         require(
-            amount >=
-                auctions[tokenId].currentBid +
-                    ((auctions[tokenId].currentBid *
-                        minBidIncrementPercentage) / 100),
+            amount
+                >= auctions[tokenId].currentBid
+                    + ((auctions[tokenId].currentBid * minBidIncrementPercentage) / 100),
             "Must send more than last bid by minBidIncrementPercentage amount"
         );
 
@@ -160,10 +165,8 @@ contract AuctionHouse is Auth, IAuctionHouse {
         // we want to know by how much the timestamp is less than start + duration
         // if the difference is less than the timeBuffer, increase the duration by the timeBuffer
         if (
-            auctions[tokenId].firstBidTime +
-                auctions[tokenId].duration -
-                block.timestamp <
-            timeBuffer
+            auctions[tokenId].firstBidTime + auctions[tokenId].duration
+                - block.timestamp < timeBuffer
         ) {
             // Playing code golf for gas optimization:
             // uint256 expectedEnd = auctions[auctionId].firstBidTime.add(auctions[auctionId].duration);
@@ -172,11 +175,8 @@ contract AuctionHouse is Auth, IAuctionHouse {
             // uint256 newDuration = auctions[auctionId].duration.add(timeToAdd);
             uint256 oldDuration = auctions[tokenId].duration;
             auctions[tokenId].duration = uint64(
-                oldDuration +
-                    (timeBuffer -
-                        auctions[tokenId].firstBidTime +
-                        oldDuration -
-                        block.timestamp)
+                oldDuration
+                    + (timeBuffer - auctions[tokenId].firstBidTime + oldDuration - block.timestamp)
             );
             extended = true;
         }
@@ -187,7 +187,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
             amount,
             lastBidder == address(0), // firstBid boolean
             extended
-        );
+            );
 
         if (extended) {
             emit AuctionDurationExtended(tokenId, auctions[tokenId].duration);
@@ -207,23 +207,19 @@ contract AuctionHouse is Auth, IAuctionHouse {
         returns (address winner)
     {
         require(
-            uint256(auctions[auctionId].firstBidTime) != 0,
-            "Auction hasn't begun"
+            uint256(auctions[auctionId].firstBidTime) != 0, "Auction hasn't begun"
         );
         require(
-            block.timestamp >=
-                auctions[auctionId].firstBidTime + auctions[auctionId].duration,
+            block.timestamp
+                >= auctions[auctionId].firstBidTime + auctions[auctionId].duration,
             "Auction hasn't completed"
         );
         Auction storage auction = auctions[auctionId];
         winner = auction.bidder;
 
         emit AuctionEnded(
-            auctionId,
-            auction.bidder,
-            auction.currentBid,
-            auction.recipients
-        );
+            auctionId, auction.bidder, auction.currentBid, auction.recipients
+            );
         LIEN_TOKEN.removeLiens(auctionId);
         delete auctions[auctionId];
     }
@@ -243,9 +239,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
         );
         if (auctions[auctionId].bidder == address(0)) {
             _handleIncomingPayment(
-                auctionId,
-                auctions[auctionId].reservePrice,
-                canceledBy
+                auctionId, auctions[auctionId].reservePrice, canceledBy
             );
         }
         _cancelAuction(auctionId);
@@ -280,18 +274,16 @@ contract AuctionHouse is Auth, IAuctionHouse {
         uint256 tokenId,
         uint256 transferAmount,
         address payee
-    ) internal {
+    )
+        internal
+    {
         require(transferAmount > uint256(0), "cannot send nothing");
 
         Auction storage auction = auctions[tokenId];
 
-        uint256 initiatorPayment = (transferAmount * auction.initiatorFee) /
-            100;
+        uint256 initiatorPayment = (transferAmount * auction.initiatorFee) / 100;
         TRANSFER_PROXY.tokenTransferFrom(
-            weth,
-            payee,
-            auction.initiator,
-            initiatorPayment
+            weth, payee, auction.initiator, initiatorPayment
         );
         transferAmount -= initiatorPayment;
 
@@ -318,19 +310,13 @@ contract AuctionHouse is Auth, IAuctionHouse {
 
                 if (payment > 0) {
                     TRANSFER_PROXY.tokenTransferFrom(
-                        weth,
-                        payee,
-                        LIEN_TOKEN.ownerOf(recipient),
-                        payment
+                        weth, payee, LIEN_TOKEN.ownerOf(recipient), payment
                     );
                 }
             }
         } else {
             TRANSFER_PROXY.tokenTransferFrom(
-                weth,
-                payee,
-                COLLATERAL_VAULT.ownerOf(tokenId),
-                transferAmount
+                weth, payee, COLLATERAL_VAULT.ownerOf(tokenId), transferAmount
             );
         }
     }

@@ -1,9 +1,10 @@
 pragma solidity ^0.8.13;
+
 pragma experimental ABIEncoderV2;
 
 interface IAuctionHouse {
     struct Auction {
-        // The current highest bid amount
+    // The current highest bid amount
         uint256 currentBid;
         // The length of time to run the auction for, after the first bid was made
         uint64 duration;
@@ -19,14 +20,11 @@ interface IAuctionHouse {
     }
 
     event AuctionCreated(
-        uint256 indexed tokenId,
-        uint256 duration,
-        uint256 reservePrice
+        uint256 indexed tokenId, uint256 duration, uint256 reservePrice
     );
 
     event AuctionReservePriceUpdated(
-        uint256 indexed tokenId,
-        uint256 reservePrice
+        uint256 indexed tokenId, uint256 reservePrice
     );
 
     event AuctionBid(
@@ -53,7 +51,9 @@ interface IAuctionHouse {
         uint256 duration,
         address initiator,
         uint256 initiatorFee
-    ) external returns (uint256);
+    )
+        external
+        returns (uint256);
 
     function createBid(uint256 tokenId, uint256 amount) external;
 
