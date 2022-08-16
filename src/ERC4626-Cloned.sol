@@ -11,10 +11,10 @@ import {ERC20} from "solmate/tokens/ERC20.sol";
 // owner (20) -> underlying (ERC20 address) ,
 
 interface IBase {
-    function name() external view virtual returns (string memory);
-    function symbol() external view virtual returns (string memory);
-    function owner() external view virtual returns(address);
-    function underlying() external view virtual returns(address);
+    function name() external view  returns (string memory);
+    function symbol() external view  returns (string memory);
+    function owner() external view  returns(address);
+    function underlying() external view  returns(address);
 }
 abstract contract Base is Clone, IBase {
 
@@ -318,8 +318,11 @@ abstract contract ERC20Cloned is Base {
         emit Transfer(from, address(0), amount);
     }
 }
+interface IVault {
+    function deposit(uint256, address) external virtual returns (uint256);
+}
 
-abstract contract ERC4626Cloned is ERC20Cloned, VaultBase {
+abstract contract ERC4626Cloned is ERC20Cloned, VaultBase, IVault {
     using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
 
@@ -341,6 +344,7 @@ abstract contract ERC4626Cloned is ERC20Cloned, VaultBase {
     function deposit(uint256 assets, address receiver)
         public
         virtual
+        override(IVault)
         returns (uint256 shares)
     {
         // Check for rounding error since we round down in previewDeposit.
