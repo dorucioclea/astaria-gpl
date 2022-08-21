@@ -307,7 +307,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
                 ++i
             ) {
                 uint256 payment;
-                uint256 leinId = liens[i];
+                uint256 lienId = liens[i];
 
                 if (transferAmount >= auction.amounts[i]) {
                     payment = auction.amounts[i];
@@ -323,10 +323,11 @@ contract AuctionHouse is Auth, IAuctionHouse {
                     TRANSFER_PROXY.tokenTransferFrom(
                         weth,
                         payee,
-                        LIEN_TOKEN.ownerOf(leinId),
+                        LIEN_TOKEN.getPayee(lienId),
+                        // LIEN_TOKEN.ownerOf(lienId),
                         payment
                     );
-                    LIEN_TOKEN.makePayment(leinId, payment);
+                    LIEN_TOKEN.makePayment(lienId, payment);
                 }
             }
         } else {
