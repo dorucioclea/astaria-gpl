@@ -246,13 +246,11 @@ contract AuctionHouse is Auth, IAuctionHouse {
             auctions[auctionId].currentBid < auctions[auctionId].reservePrice,
             "cancelAuction: Auction is at or above reserve"
         );
-        if (auctions[auctionId].bidder == address(0)) {
-            _handleIncomingPayment(
-                auctionId,
-                auctions[auctionId].reservePrice,
-                canceledBy
-            );
-        }
+        _handleIncomingPayment(
+            auctionId,
+            auctions[auctionId].reservePrice,
+            canceledBy
+        );
         _cancelAuction(auctionId);
     }
 
@@ -320,14 +318,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
                 }
 
                 if (payment > 0) {
-                    TRANSFER_PROXY.tokenTransferFrom(
-                        weth,
-                        payee,
-                        LIEN_TOKEN.getPayee(lienId),
-                        // LIEN_TOKEN.ownerOf(lienId),
-                        payment
-                    );
-                    LIEN_TOKEN.makePayment(lienId, payment);
+                    LIEN_TOKEN.makePayment(lienId, payment, payee);
                 }
             }
         } else {
