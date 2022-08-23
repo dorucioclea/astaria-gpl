@@ -2,11 +2,10 @@
 pragma solidity ^0.8.16;
 
 import {IERC721} from "./interfaces/IERC721.sol";
+
 /// @notice Modern, minimalist, and gas efficient ERC-721 implementation.
 /// @author Solmate (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC721.sol)
 abstract contract ERC721 is IERC721 {
-
-
     /*//////////////////////////////////////////////////////////////
 METADATA STORAGE/LOGIC
 //////////////////////////////////////////////////////////////*/
@@ -72,15 +71,19 @@ ERC721 LOGIC
         emit ApprovalForAll(msg.sender, operator, approved);
     }
 
-    function transferFrom(address from, address to, uint256 id) public override(IERC721)  {
+    function transferFrom(address from, address to, uint256 id) public override (IERC721) {
         require(from == _ownerOf[id], "WRONG_FROM");
 
         require(to != address(0), "INVALID_RECIPIENT");
 
         require(
-            msg.sender == from || isApprovedForAll[from][msg.sender] || msg.sender == getApproved[id] || msg.sender == address(this), "NOT_AUTHORIZED"
+            msg.sender == from || isApprovedForAll[from][msg.sender] || msg.sender == getApproved[id] || msg.sender == address(this),
+            "NOT_AUTHORIZED"
         );
+        _transfer(from, to, id);
+    }
 
+    function _transfer(address from, address to, uint256 id) internal {
         // Underflow of the sender's balance is impossible because we check for
         // ownership above and the recipient's balance can't realistically overflow.
         unchecked {
@@ -106,7 +109,7 @@ ERC721 LOGIC
         );
     }
 
-    function safeTransferFrom(address from, address to, uint256 id, bytes calldata data) external override(IERC721) {
+    function safeTransferFrom(address from, address to, uint256 id, bytes calldata data) external override (IERC721) {
         transferFrom(from, to, id);
 
         require(
