@@ -99,7 +99,8 @@ contract AuctionHouse is Auth, IAuctionHouse {
         uint256 tokenId,
         uint256 duration,
         address initiator,
-        uint256 initiatorFee
+        uint256 initiatorFee,
+        uint256 epochCap
     ) external requiresAuth returns (uint256 reserve) {
         uint256[] memory amounts;
         (reserve, amounts, ) = LIEN_TOKEN.stopLiens(tokenId);
@@ -110,6 +111,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
         newAuction.amounts = amounts;
         newAuction.initiator = initiator;
         newAuction.initiatorFee = initiatorFee;
+        newAuction.epochCap = epochCap; 
 
         (address underlying, ) = COLLATERAL_TOKEN.getUnderlying(tokenId);
 
@@ -165,6 +167,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
         // we want to know by how much the timestamp is less than start + duration
         // if the difference is less than the timeBuffer, increase the duration by the timeBuffer
         if (
+            (auctions[tokenId].epochCap == 0 || block.timestamp + timeBuffer < auctions[tokenId].epochCap) &&
             auctions[tokenId].firstBidTime +
                 auctions[tokenId].duration -
                 block.timestamp <

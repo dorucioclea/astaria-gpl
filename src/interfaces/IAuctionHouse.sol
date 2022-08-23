@@ -17,6 +17,7 @@ interface IAuctionHouse {
         address bidder;
         address initiator;
         uint256 initiatorFee;
+        uint256 epochCap;
     }
 
     event AuctionCreated(uint256 indexed tokenId, uint256 duration, uint256 reservePrice);
@@ -31,7 +32,7 @@ interface IAuctionHouse {
 
     event AuctionCanceled(uint256 indexed tokenId);
 
-    function createAuction(uint256 tokenId, uint256 duration, address initiator, uint256 initiatorFee)
+    function createAuction(uint256 tokenId, uint256 duration, address initiator, uint256 initiatorFee, uint256 epochCap)
         external
         returns (uint256);
 
