@@ -31,34 +31,8 @@ contract AuctionHouse is Auth, IAuctionHouse {
     ILienToken LIEN_TOKEN;
     ICollateralToken COLLATERAL_TOKEN;
 
-    // tokenContract(of the collection) => list of auctions
-    mapping(address => uint256[]) auctionQueue;
-
     // A mapping of all of the auctions currently running.
     mapping(uint256 => IAuctionHouse.Auction) auctions;
-
-    /**
-     * @notice Require that the specified auction exists
-     */
-    modifier auctionQueued(uint256 auctionId, bool auctionClose) {
-        require(auctionExists(auctionId), "Auction doesn't exist");
-        (address underlying,) = COLLATERAL_TOKEN.getUnderlying(auctionId);
-        uint256 maxActive =
-            auctionQueue[underlying].length > uint256(maxActiveAuctionsPerUnderlying)
-            ? uint256(maxActiveAuctionsPerUnderlying)
-            : auctionQueue[underlying].length;
-        bool found = false;
-        for (uint256 i = 0; i < maxActive; ++i) {
-            if (auctionQueue[underlying][i] == auctionId) {
-                found = true;
-                if (auctionClose) {
-                    delete auctionQueue[underlying][i];
-                }
-            }
-        }
-        require(found, "Auction has not started");
-        _;
-    }
 
     /*
      * Constructor
@@ -69,9 +43,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
         address COLLATERAL_TOKEN_,
         address LIEN_TOKEN_,
         address transferProxy_
-    )
-        Auth(msg.sender, Authority(address(AUTHORITY_)))
-    {
+    ) Auth(msg.sender, Authority(address(AUTHORITY_))) {
         weth = weth_;
         TRANSFER_PROXY = ITransferProxy(transferProxy_);
         COLLATERAL_TOKEN = ICollateralToken(COLLATERAL_TOKEN_);
@@ -85,7 +57,10 @@ contract AuctionHouse is Auth, IAuctionHouse {
         ERC20(weth).safeApprove(address(LIEN_TOKEN), type(uint256).max);
     }
 
-    function setMaxActiveAuctionsPerUnderlying(uint8 newMax) external requiresAuth {
+    function setMaxActiveAuctionsPerUnderlying(uint8 newMax)
+        external
+        requiresAuth
+    {
         maxActiveAuctionsPerUnderlying = newMax;
     }
 
@@ -94,13 +69,15 @@ contract AuctionHouse is Auth, IAuctionHouse {
      * @dev Store the auction details in the auctions mapping and emit an AuctionCreated event.
      * If there is no curator, or if the curator is the auction creator, automatically approve the auction.
      */
-    function createAuction(uint256 tokenId, uint256 duration, address initiator, uint256 initiatorFee, uint256 epochCap)
-        external
-        requiresAuth
-        returns (uint256 reserve)
-    {
+    function createAuction(
+        uint256 tokenId,
+        uint256 duration,
+        address initiator,
+        uint256 initiatorFee,
+        uint256 epochCap
+    ) external requiresAuth returns (uint256 reserve) {
         uint256[] memory amounts;
-        (reserve, amounts,) = LIEN_TOKEN.stopLiens(tokenId);
+        (reserve, amounts, ) = LIEN_TOKEN.stopLiens(tokenId);
 
         Auction storage newAuction = auctions[tokenId];
         newAuction.duration = uint64(duration);
@@ -108,11 +85,9 @@ contract AuctionHouse is Auth, IAuctionHouse {
         newAuction.amounts = amounts;
         newAuction.initiator = initiator;
         newAuction.initiatorFee = initiatorFee;
+        newAuction.firstBidTime = uint64(block.timestamp);
+        newAuction.currentBid = 0;
         newAuction.epochCap = epochCap;
-
-        (address underlying,) = COLLATERAL_TOKEN.getUnderlying(tokenId);
-
-        auctionQueue[underlying].push(tokenId);
 
         emit AuctionCreated(tokenId, duration, reserve);
     }
@@ -123,14 +98,19 @@ contract AuctionHouse is Auth, IAuctionHouse {
      * If the auction is run in native ETH, the ETH is wrapped so it can be identically to other
      * auction currencies in this contract.
      */
-    function createBid(uint256 tokenId, uint256 amount) external override auctionQueued(tokenId, false) {
+    function createBid(uint256 tokenId, uint256 amount) external override {
         address lastBidder = auctions[tokenId].bidder;
         require(
-            auctions[tokenId].firstBidTime == 0 || block.timestamp < auctions[tokenId].firstBidTime + auctions[tokenId].duration,
+            auctions[tokenId].firstBidTime == 0 ||
+                block.timestamp <
+                auctions[tokenId].firstBidTime + auctions[tokenId].duration,
             "Auction expired"
         );
         require(
-            amount >= auctions[tokenId].currentBid + ((auctions[tokenId].currentBid * minBidIncrementPercentage) / 100),
+            amount >=
+                auctions[tokenId].currentBid +
+                    ((auctions[tokenId].currentBid *
+                        minBidIncrementPercentage) / 100),
             "Must send more than last bid by minBidIncrementPercentage amount"
         );
 
@@ -155,8 +135,12 @@ contract AuctionHouse is Auth, IAuctionHouse {
         // we want to know by how much the timestamp is less than start + duration
         // if the difference is less than the timeBuffer, increase the duration by the timeBuffer
         if (
-            (auctions[tokenId].epochCap == 0 || block.timestamp + timeBuffer < auctions[tokenId].epochCap)
-                && auctions[tokenId].firstBidTime + auctions[tokenId].duration - block.timestamp < timeBuffer
+            (auctions[tokenId].epochCap == 0 ||
+                block.timestamp + timeBuffer < auctions[tokenId].epochCap) &&
+            auctions[tokenId].firstBidTime +
+                auctions[tokenId].duration -
+                block.timestamp <
+            timeBuffer
         ) {
             // Playing code golf for gas optimization:
             // uint256 expectedEnd = auctions[auctionId].firstBidTime.add(auctions[auctionId].duration);
@@ -164,8 +148,13 @@ contract AuctionHouse is Auth, IAuctionHouse {
             // uint256 timeToAdd = timeBuffer.sub(timeRemaining);
             // uint256 newDuration = auctions[auctionId].duration.add(timeToAdd);
             uint256 oldDuration = auctions[tokenId].duration;
-            auctions[tokenId].duration =
-                uint64(oldDuration + (timeBuffer - auctions[tokenId].firstBidTime + oldDuration - block.timestamp));
+            auctions[tokenId].duration = uint64(
+                oldDuration +
+                    (timeBuffer -
+                        auctions[tokenId].firstBidTime +
+                        oldDuration -
+                        block.timestamp)
+            );
             extended = true;
         }
 
@@ -175,7 +164,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
             amount,
             lastBidder == address(0), // firstBid boolean
             extended
-            );
+        );
 
         if (extended) {
             emit AuctionDurationExtended(tokenId, auctions[tokenId].duration);
@@ -191,17 +180,26 @@ contract AuctionHouse is Auth, IAuctionHouse {
         external
         override
         requiresAuth
-        auctionQueued(auctionId, true)
         returns (address winner)
     {
-        require(uint256(auctions[auctionId].firstBidTime) != 0, "Auction hasn't begun");
         require(
-            block.timestamp >= auctions[auctionId].firstBidTime + auctions[auctionId].duration, "Auction hasn't completed"
+            block.timestamp >=
+                auctions[auctionId].firstBidTime + auctions[auctionId].duration,
+            "Auction hasn't completed"
         );
         Auction storage auction = auctions[auctionId];
-        winner = auction.bidder;
+        if (auction.bidder == address(0)) {
+            winner = auction.initiator;
+        } else {
+            winner = auction.bidder;
+        }
 
-        emit AuctionEnded(auctionId, auction.bidder, auction.currentBid, auction.recipients);
+        emit AuctionEnded(
+            auctionId,
+            auction.bidder,
+            auction.currentBid,
+            auction.recipients
+        );
         LIEN_TOKEN.removeLiens(auctionId);
         delete auctions[auctionId];
     }
@@ -212,41 +210,70 @@ contract AuctionHouse is Auth, IAuctionHouse {
      */
     function cancelAuction(uint256 auctionId, address canceledBy)
         external
-        auctionQueued(auctionId, true)
         requiresAuth
     {
         require(
             auctions[auctionId].currentBid < auctions[auctionId].reservePrice,
             "cancelAuction: Auction is at or above reserve"
         );
-        _handleIncomingPayment(auctionId, auctions[auctionId].reservePrice, canceledBy);
+        _handleIncomingPayment(
+            auctionId,
+            auctions[auctionId].reservePrice,
+            canceledBy
+        );
         _cancelAuction(auctionId);
     }
 
     function getAuctionData(uint256 _auctionId)
         public
         view
-        returns (uint256 amount, uint256 duration, uint256 firstBidTime, uint256 reservePrice, address bidder)
+        returns (
+            uint256 amount,
+            uint256 duration,
+            uint256 firstBidTime,
+            uint256 reservePrice,
+            address bidder
+        )
     {
         IAuctionHouse.Auction memory auction = auctions[_auctionId];
-        return (auction.currentBid, auction.duration, auction.firstBidTime, auction.reservePrice, auction.bidder);
+        return (
+            auction.currentBid,
+            auction.duration,
+            auction.firstBidTime,
+            auction.reservePrice,
+            auction.bidder
+        );
     }
 
     /**
      * @dev Given an amount and a currency, transfer the currency to this contract.
      */
-    function _handleIncomingPayment(uint256 tokenId, uint256 transferAmount, address payee) internal {
+    function _handleIncomingPayment(
+        uint256 tokenId,
+        uint256 transferAmount,
+        address payee
+    ) internal {
         require(transferAmount > uint256(0), "cannot send nothing");
 
         Auction storage auction = auctions[tokenId];
 
-        uint256 initiatorPayment = (transferAmount * auction.initiatorFee) / 100;
-        TRANSFER_PROXY.tokenTransferFrom(weth, payee, auction.initiator, initiatorPayment);
+        uint256 initiatorPayment = (transferAmount * auction.initiatorFee) /
+            100;
+        TRANSFER_PROXY.tokenTransferFrom(
+            weth,
+            payee,
+            auction.initiator,
+            initiatorPayment
+        );
         transferAmount -= initiatorPayment;
 
         if (auction.amounts.length > 0) {
             uint256[] memory liens = LIEN_TOKEN.getLiens(tokenId);
-            for (uint256 i = liens.length - auction.amounts.length; i < liens.length; ++i) {
+            for (
+                uint256 i = liens.length - auction.amounts.length;
+                i < liens.length;
+                ++i
+            ) {
                 uint256 payment;
                 uint256 lienId = liens[i];
 
@@ -265,7 +292,12 @@ contract AuctionHouse is Auth, IAuctionHouse {
                 }
             }
         } else {
-            TRANSFER_PROXY.tokenTransferFrom(weth, payee, COLLATERAL_TOKEN.ownerOf(tokenId), transferAmount);
+            TRANSFER_PROXY.tokenTransferFrom(
+                weth,
+                payee,
+                COLLATERAL_TOKEN.ownerOf(tokenId),
+                transferAmount
+            );
         }
     }
 
