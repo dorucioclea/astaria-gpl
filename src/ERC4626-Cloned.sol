@@ -51,7 +51,7 @@ abstract contract VaultBase is Base {
         return _getArgUint256(132);
     }
 
-    function BROKER_TYPE() public view returns (uint256) {
+    function VAULT_TYPE() public view returns (uint256) {
         return _getArgUint256(164);
     }
 }
@@ -89,7 +89,7 @@ abstract contract VaultBase is Base {
 //        return _getArgAddress(188);
 //    }
 //
-//    function BROKER_TYPE() public pure returns (uint256) {
+//    function VAULT_TYPE() public pure returns (uint256) {
 //        return _getArgUint256(220);
 //    }
 //
