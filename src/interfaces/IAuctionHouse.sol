@@ -8,6 +8,7 @@ interface IAuctionHouse {
         uint256 currentBid;
         // The length of time to run the auction for, after the first bid was made
         uint64 duration;
+        uint64 maxDuration;
         // The time of the first bid
         uint64 firstBidTime;
         uint256 reservePrice;

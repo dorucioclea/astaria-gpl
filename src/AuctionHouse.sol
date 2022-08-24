@@ -83,6 +83,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
         newAuction.initiator = initiator;
         newAuction.initiatorFee = initiatorFee;
         newAuction.firstBidTime = uint64(block.timestamp);
+        newAuction.maxDuration = uint64(block.timestamp + 3 days);
         newAuction.currentBid = 0;
         newAuction.epochCap = epochCap;
 
@@ -135,10 +136,15 @@ contract AuctionHouse is Auth, IAuctionHouse {
             // uint256 timeRemaining = expectedEnd.sub(block.timestamp);
             // uint256 timeToAdd = timeBuffer.sub(timeRemaining);
             // uint256 newDuration = auctions[auctionId].duration.add(timeToAdd);
+
+            //TODO: add the cap to the duration, do not let it extend beyond 24 hours extra from max duration
             uint256 oldDuration = auctions[tokenId].duration;
-            auctions[tokenId].duration =
+            uint64 newDuration =
                 uint64(oldDuration + (timeBuffer - auctions[tokenId].firstBidTime + oldDuration - block.timestamp));
-            extended = true;
+            if (newDuration <= auctions[tokenId].maxDuration) {
+                auctions[tokenId].duration = newDuration;
+                extended = true;
+            }
         }
 
         emit AuctionBid(
