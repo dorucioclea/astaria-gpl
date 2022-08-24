@@ -83,7 +83,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
         newAuction.initiator = initiator;
         newAuction.initiatorFee = initiatorFee;
         newAuction.firstBidTime = uint64(block.timestamp);
-        newAuction.maxDuration = uint64(block.timestamp + 3 days);
+        newAuction.maxDuration = uint64(duration + 1 days);
         newAuction.currentBid = 0;
         newAuction.epochCap = epochCap;
 
