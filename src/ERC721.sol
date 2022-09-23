@@ -103,7 +103,8 @@ ERC721 LOGIC
 
         require(
             to.code.length == 0
-                || ERC721TokenReceiver(to).onERC721Received(msg.sender, from, id, "") == ERC721TokenReceiver.onERC721Received.selector,
+                || ERC721TokenReceiver(to).onERC721Received(msg.sender, from, id, "")
+                    == ERC721TokenReceiver.onERC721Received.selector,
             "UNSAFE_RECIPIENT"
         );
     }
@@ -113,7 +114,8 @@ ERC721 LOGIC
 
         require(
             to.code.length == 0
-                || ERC721TokenReceiver(to).onERC721Received(msg.sender, from, id, data) == ERC721TokenReceiver.onERC721Received.selector,
+                || ERC721TokenReceiver(to).onERC721Received(msg.sender, from, id, data)
+                    == ERC721TokenReceiver.onERC721Received.selector,
             "UNSAFE_RECIPIENT"
         );
     }

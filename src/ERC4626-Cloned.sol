@@ -56,81 +56,6 @@ abstract contract VaultBase is Base {
     }
 }
 
-//abstract contract Base is Clone {
-//    function COLLATERAL_VAULT() public pure returns (address) {
-//        return _getArgAddress(0);
-//    }
-//
-//    function underlying() public pure returns (address) {
-//        return _getArgAddress(20);
-//    }
-//
-//    function router() public pure returns (address) {
-//        return _getArgAddress(40);
-//    }
-//
-//    function vaultHash() public pure returns (bytes32) {
-//        return _getArgBytes32(60);
-//    }
-//
-//    function expiration() public pure returns (uint256) {
-//        return _getArgUint256(92);
-//    }
-//
-//    function buyout() public pure returns (uint256) {
-//        return _getArgUint256(124);
-//    }
-//
-//    function appraiser() public pure returns (address) {
-//        return _getArgAddress(156);
-//    }
-//
-//    function AUCTION_HOUSE() public pure returns (address) {
-//        return _getArgAddress(188);
-//    }
-//
-//    function VAULT_TYPE() public pure returns (uint256) {
-//        return _getArgUint256(220);
-//    }
-//
-//    function start() public pure returns (uint256) {
-//        return _getArgUint256(252);
-//    }
-//
-//    function epoch_length() public pure returns (uint256) {
-//        return _getArgUint256(284);
-//    }
-//
-//    function decimals() public pure returns (uint8) {
-//        return 18;
-//    }
-//
-//    function _getArgBytes32(uint256 argOffset)
-//        internal
-//        pure
-//        returns (bytes32 arg)
-//    {
-//        uint256 offset = _getImmutableArgsOffset();
-//        // solhint-disable-next-line no-inline-assembly
-//        assembly {
-//            arg := calldataload(add(offset, argOffset))
-//        }
-//    }
-//
-//    //    string constant name = string(abi.encodePacked("Astaria BondVault-", vaultHash()));
-//    string constant name = string("Astaria BondVault");
-//
-//    //    function name() public view returns (string memory) {
-//    //        return string("Astaria BondVault-", vaultHash());
-//    //    }
-//
-//    function symbol() public view returns (string memory) {
-//        return string(
-//            abi.encodePacked("AST-", ERC20(underlying()).symbol(), "-", vaultHash())
-//        );
-//    }
-//}
-
 /// @notice Modern and gas efficient ERC20 + EIP-2612 implementation.
 /// @author Solmate (https://github.com/Rari-Capital/solmate/blob/main/src/tokens/ERC20.sol)
 /// @author Modified from Uniswap (https://github.com/Uniswap/uniswap-v2-core/blob/master/contracts/UniswapV2ERC20.sol)
@@ -139,7 +64,11 @@ abstract contract VaultBase is Base {
 abstract contract ERC20Cloned is Base {
     event Transfer(address indexed from, address indexed to, uint256 amount);
 
-    event Approval(address indexed owner, address indexed spender, uint256 amount);
+    event Approval(
+        address indexed owner,
+        address indexed spender,
+        uint256 amount
+    );
 
     uint256 public totalSupply;
 
@@ -166,7 +95,11 @@ abstract contract ERC20Cloned is Base {
     //        INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
     //    }
 
-    function approve(address spender, uint256 amount) public virtual returns (bool) {
+    function approve(address spender, uint256 amount)
+        public
+        virtual
+        returns (bool)
+    {
         allowance[msg.sender][spender] = amount;
 
         emit Approval(msg.sender, spender, amount);
@@ -174,7 +107,11 @@ abstract contract ERC20Cloned is Base {
         return true;
     }
 
-    function transfer(address to, uint256 amount) public virtual returns (bool) {
+    function transfer(address to, uint256 amount)
+        public
+        virtual
+        returns (bool)
+    {
         balanceOf[msg.sender] -= amount;
 
         // Cannot overflow because the sum of all user
@@ -188,7 +125,11 @@ abstract contract ERC20Cloned is Base {
         return true;
     }
 
-    function transferFrom(address from, address to, uint256 amount) public virtual returns (bool) {
+    function transferFrom(
+        address from,
+        address to,
+        uint256 amount
+    ) public virtual returns (bool) {
         uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
 
         if (allowed != type(uint256).max) {
@@ -208,10 +149,15 @@ abstract contract ERC20Cloned is Base {
         return true;
     }
 
-    function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
-        public
-        virtual
-    {
+    function permit(
+        address owner,
+        address spender,
+        uint256 value,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) public virtual {
         require(deadline >= block.timestamp, "PERMIT_DEADLINE_EXPIRED");
 
         // Unchecked because the only math done is incrementing
@@ -224,7 +170,9 @@ abstract contract ERC20Cloned is Base {
                         DOMAIN_SEPARATOR(),
                         keccak256(
                             abi.encode(
-                                keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"),
+                                keccak256(
+                                    "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+                                ),
                                 owner,
                                 spender,
                                 value,
@@ -239,7 +187,10 @@ abstract contract ERC20Cloned is Base {
                 s
             );
 
-            require(recoveredAddress != address(0) && recoveredAddress == owner, "INVALID_SIGNER");
+            require(
+                recoveredAddress != address(0) && recoveredAddress == owner,
+                "INVALID_SIGNER"
+            );
 
             allowance[recoveredAddress][spender] = value;
         }
@@ -252,15 +203,18 @@ abstract contract ERC20Cloned is Base {
     }
 
     function computeDomainSeparator() internal view virtual returns (bytes32) {
-        return keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256(bytes(IBase(address(this)).name())),
-                keccak256("1"),
-                block.chainid,
-                address(this)
-            )
-        );
+        return
+            keccak256(
+                abi.encode(
+                    keccak256(
+                        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                    ),
+                    keccak256(bytes(IBase(address(this)).name())),
+                    keccak256("1"),
+                    block.chainid,
+                    address(this)
+                )
+            );
     }
 
     function _mint(address to, uint256 amount) internal virtual {
@@ -296,13 +250,27 @@ abstract contract ERC4626Cloned is ERC20Cloned, VaultBase, IVault {
     using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
 
-    event Deposit(address indexed caller, address indexed owner, uint256 assets, uint256 shares);
-
-    event Withdraw(
-        address indexed caller, address indexed receiver, address indexed owner, uint256 assets, uint256 shares
+    event Deposit(
+        address indexed caller,
+        address indexed owner,
+        uint256 assets,
+        uint256 shares
     );
 
-    function deposit(uint256 assets, address receiver) public virtual override (IVault) returns (uint256 shares) {
+    event Withdraw(
+        address indexed caller,
+        address indexed receiver,
+        address indexed owner,
+        uint256 assets,
+        uint256 shares
+    );
+
+    function deposit(uint256 assets, address receiver)
+        public
+        virtual
+        override(IVault)
+        returns (uint256 shares)
+    {
         // Check for rounding error since we round down in previewDeposit.
         require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
 
@@ -316,7 +284,11 @@ abstract contract ERC4626Cloned is ERC20Cloned, VaultBase, IVault {
         afterDeposit(assets, shares);
     }
 
-    function mint(uint256 shares, address receiver) public virtual returns (uint256 assets) {
+    function mint(uint256 shares, address receiver)
+        public
+        virtual
+        returns (uint256 assets)
+    {
         assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
 
         // Need to transfer before minting or ERC777s could reenter.
@@ -329,7 +301,11 @@ abstract contract ERC4626Cloned is ERC20Cloned, VaultBase, IVault {
         afterDeposit(assets, shares);
     }
 
-    function withdraw(uint256 assets, address receiver, address owner) public virtual returns (uint256 shares) {
+    function withdraw(
+        uint256 assets,
+        address receiver,
+        address owner
+    ) public virtual returns (uint256 shares) {
         shares = previewWithdraw(assets); // No need to check for rounding error, previewWithdraw rounds up.
 
         if (msg.sender != owner) {
@@ -349,7 +325,11 @@ abstract contract ERC4626Cloned is ERC20Cloned, VaultBase, IVault {
         ERC20(underlying()).safeTransfer(receiver, assets);
     }
 
-    function redeem(uint256 shares, address receiver, address owner) public virtual returns (uint256 assets) {
+    function redeem(
+        uint256 shares,
+        address receiver,
+        address owner
+    ) public virtual returns (uint256 assets) {
         if (msg.sender != owner) {
             uint256 allowed = allowance[owner][msg.sender]; // Saves gas for limited approvals.
 
@@ -372,19 +352,34 @@ abstract contract ERC4626Cloned is ERC20Cloned, VaultBase, IVault {
 
     function totalAssets() public view virtual returns (uint256);
 
-    function convertToShares(uint256 assets) public view virtual returns (uint256) {
+    function convertToShares(uint256 assets)
+        public
+        view
+        virtual
+        returns (uint256)
+    {
         uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
 
         return supply == 0 ? assets : assets.mulDivDown(supply, totalAssets());
     }
 
-    function convertToAssets(uint256 shares) public view virtual returns (uint256) {
+    function convertToAssets(uint256 shares)
+        public
+        view
+        virtual
+        returns (uint256)
+    {
         uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
 
         return supply == 0 ? shares : shares.mulDivDown(totalAssets(), supply);
     }
 
-    function previewDeposit(uint256 assets) public view virtual returns (uint256) {
+    function previewDeposit(uint256 assets)
+        public
+        view
+        virtual
+        returns (uint256)
+    {
         return convertToShares(assets);
     }
 
@@ -394,13 +389,23 @@ abstract contract ERC4626Cloned is ERC20Cloned, VaultBase, IVault {
         return supply == 0 ? shares : shares.mulDivUp(totalAssets(), supply);
     }
 
-    function previewWithdraw(uint256 assets) public view virtual returns (uint256) {
+    function previewWithdraw(uint256 assets)
+        public
+        view
+        virtual
+        returns (uint256)
+    {
         uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
 
         return supply == 0 ? assets : assets.mulDivUp(supply, totalAssets());
     }
 
-    function previewRedeem(uint256 shares) public view virtual returns (uint256) {
+    function previewRedeem(uint256 shares)
+        public
+        view
+        virtual
+        returns (uint256)
+    {
         return convertToAssets(shares);
     }
 
