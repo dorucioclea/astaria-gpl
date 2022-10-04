@@ -128,8 +128,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
 
             //TODO: add the cap to the duration, do not let it extend beyond 24 hours extra from max duration
             uint256 oldDuration = auctions[tokenId].duration;
-            uint64 newDuration =
-                uint64(oldDuration + (timeBuffer - auctions[tokenId].firstBidTime + oldDuration - block.timestamp));
+            uint64 newDuration = uint64(oldDuration + (block.timestamp + timeBuffer - auctions[tokenId].firstBidTime));
             if (newDuration <= auctions[tokenId].maxDuration) {
                 auctions[tokenId].duration = newDuration;
                 extended = true;
@@ -166,7 +165,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
             winner = auction.bidder;
         }
 
-        emit AuctionEnded(auctionId, auction.bidder, auction.currentBid, auction.recipients);
+        emit AuctionEnded(auctionId, winner, auction.currentBid, auction.recipients);
         LIEN_TOKEN.removeLiens(auctionId);
         delete auctions[auctionId];
     }
