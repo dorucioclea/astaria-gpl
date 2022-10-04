@@ -38,15 +38,15 @@ contract AuctionHouse is Auth, IAuctionHouse {
      */
     constructor(
         address weth_,
-        address AUTHORITY_,
-        address COLLATERAL_TOKEN_,
-        address LIEN_TOKEN_,
-        address transferProxy_
+        Authority AUTHORITY_,
+        ICollateralToken COLLATERAL_TOKEN_,
+        ILienToken LIEN_TOKEN_,
+        ITransferProxy transferProxy_
     ) Auth(msg.sender, Authority(address(AUTHORITY_))) {
         weth = weth_;
-        TRANSFER_PROXY = ITransferProxy(transferProxy_);
-        COLLATERAL_TOKEN = ICollateralToken(COLLATERAL_TOKEN_);
-        LIEN_TOKEN = ILienToken(LIEN_TOKEN_);
+        TRANSFER_PROXY = transferProxy_;
+        COLLATERAL_TOKEN = COLLATERAL_TOKEN_;
+        LIEN_TOKEN = LIEN_TOKEN_;
         timeBuffer = 15 * 60;
         // extend 15 minutes after every bid made in last 15 minutes
         minBidIncrementPercentage = 5;

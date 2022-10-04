@@ -82,18 +82,6 @@ abstract contract ERC20Cloned is Base {
 
     mapping(address => uint256) public nonces;
 
-    //    constructor(
-    //        string memory _name,
-    //        string memory _symbol,
-    //        uint8 _decimals
-    //    ) {
-    //        name = _name;
-    //        symbol = _symbol;
-    //        decimals = _decimals;
-    //
-    //        INITIAL_CHAIN_ID = block.chainid;
-    //        INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
-    //    }
 
     function approve(address spender, uint256 amount)
         public
