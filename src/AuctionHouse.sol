@@ -67,7 +67,6 @@ contract AuctionHouse is Auth, IAuctionHouse {
         requiresAuth
         returns (uint256 reserve)
     {
-        uint256[] memory amounts;
         (reserve,) = LIEN_TOKEN.stopLiens(tokenId);
 
         Auction storage newAuction = auctions[tokenId];
