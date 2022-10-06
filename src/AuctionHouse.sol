@@ -14,7 +14,7 @@ import "./interfaces/IWETH9.sol";
 import {ILienToken} from "../../../src/interfaces/ILienToken.sol";
 import {ICollateralToken} from "../../../src/interfaces/ICollateralToken.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
-import {SafeCastLib} from "solmate/utils/SafeCastLib.sol";
+import {SafeCastLib} from "./utils/SafeCastLib.sol";
 contract AuctionHouse is Auth, IAuctionHouse {
     using SafeTransferLib for ERC20;
     using SafeCastLib for uint256;
