@@ -53,9 +53,7 @@ library SafeCastLib {
         y = uint64(x);
     }
 
-    event log(uint256 x);
-    function safeCastTo32(uint256 x) internal   returns (uint32 y) {
-        emit log(x);
+    function safeCastTo32(uint256 x) internal pure returns (uint32 y) {
         require(x < 1 << 32);
 
         y = uint32(x);

@@ -51,8 +51,8 @@ abstract contract VaultBase is Base {
         return _getArgUint256(132);
     }
 
-    function VAULT_TYPE() public view returns (uint256) {
-        return _getArgUint256(164);
+    function VAULT_TYPE() public view returns (uint8) {
+        return _getArgUint8(164);
     }
 }
 
