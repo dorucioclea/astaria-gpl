@@ -15,44 +15,48 @@ interface IBase {
 
     function symbol() external view returns (string memory);
 
-    function owner() external view returns (address);
+    function owner() external pure returns (address);
 
-    function underlying() external view returns (address);
+    function underlying() external pure returns (address);
 }
 
 abstract contract Base is Clone, IBase {
-    function owner() public view returns (address) {
+    function owner() public pure returns (address) {
         return _getArgAddress(0);
     }
 
-    function underlying() public view returns (address) {
+    function underlying() public pure returns (address) {
         return _getArgAddress(20);
     }
 }
 
 abstract contract VaultBase is Base {
-    function COLLATERAL_TOKEN() public view returns (address) {
+    function COLLATERAL_TOKEN() public pure returns (address) {
         return _getArgAddress(40);
     }
 
-    function ROUTER() public view returns (address) {
+    function ROUTER() public pure returns (address) {
         return _getArgAddress(60);
     }
 
-    function AUCTION_HOUSE() public view returns (address) {
+    function AUCTION_HOUSE() public pure returns (address) {
         return _getArgAddress(80);
     }
 
-    function START() public view returns (uint256) {
+    function START() public pure returns (uint256) {
         return _getArgUint256(100);
     }
 
-    function EPOCH_LENGTH() public view returns (uint256) {
+    function EPOCH_LENGTH() public pure returns (uint256) {
         return _getArgUint256(132);
     }
 
-    function VAULT_TYPE() public view returns (uint256) {
-        return _getArgUint256(164);
+    function VAULT_TYPE() public pure returns (uint8) {
+        return _getArgUint8(164);
+    }
+
+    function VAULT_FEE() public pure returns (uint256) {
+        return _getArgUint256(172);
     }
 }
 
@@ -76,24 +80,8 @@ abstract contract ERC20Cloned is Base {
 
     mapping(address => mapping(address => uint256)) public allowance;
 
-    uint256 internal INITIAL_CHAIN_ID;
-
-    bytes32 internal INITIAL_DOMAIN_SEPARATOR;
-
     mapping(address => uint256) public nonces;
 
-    //    constructor(
-    //        string memory _name,
-    //        string memory _symbol,
-    //        uint8 _decimals
-    //    ) {
-    //        name = _name;
-    //        symbol = _symbol;
-    //        decimals = _decimals;
-    //
-    //        INITIAL_CHAIN_ID = block.chainid;
-    //        INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
-    //    }
 
     function approve(address spender, uint256 amount)
         public

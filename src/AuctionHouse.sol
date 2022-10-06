@@ -13,24 +13,26 @@ import {ITransferProxy} from "./interfaces/ITransferProxy.sol";
 import "./interfaces/IWETH9.sol";
 import {ILienToken} from "../../../src/interfaces/ILienToken.sol";
 import {ICollateralToken} from "../../../src/interfaces/ICollateralToken.sol";
-
+import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
+import {SafeCastLib} from "./utils/SafeCastLib.sol";
 contract AuctionHouse is Auth, IAuctionHouse {
-    // The minimum amount of time left in an auction after a new bid is created
-    uint256 timeBuffer;
-
     using SafeTransferLib for ERC20;
-
+    using SafeCastLib for uint256;
+    using FixedPointMathLib for uint256;
+    // The minimum amount of time left in an auction after a new bid is created
+    uint256 public timeBuffer;
     // The minimum percentage difference between the last bid amount and the current bid.
-    uint8 minBidIncrementPercentage;
+    uint256 public minBidIncrementPercentage;
 
     // / The address of the WETH contract, so that any ETH transferred can be handled as an ERC-20
-    address weth;
+    address public weth;
 
     ITransferProxy TRANSFER_PROXY;
     ILienToken LIEN_TOKEN;
     ICollateralToken COLLATERAL_TOKEN;
 
     // A mapping of all of the auctions currently running.
+    // collateralToken ID => auction
     mapping(uint256 => IAuctionHouse.Auction) auctions;
 
     /*
@@ -38,16 +40,16 @@ contract AuctionHouse is Auth, IAuctionHouse {
      */
     constructor(
         address weth_,
-        address AUTHORITY_,
-        address COLLATERAL_TOKEN_,
-        address LIEN_TOKEN_,
-        address transferProxy_
+        Authority AUTHORITY_,
+        ICollateralToken COLLATERAL_TOKEN_,
+        ILienToken LIEN_TOKEN_,
+        ITransferProxy transferProxy_
     ) Auth(msg.sender, Authority(address(AUTHORITY_))) {
         weth = weth_;
-        TRANSFER_PROXY = ITransferProxy(transferProxy_);
-        COLLATERAL_TOKEN = ICollateralToken(COLLATERAL_TOKEN_);
-        LIEN_TOKEN = ILienToken(LIEN_TOKEN_);
-        timeBuffer = 15 * 60;
+        TRANSFER_PROXY = transferProxy_;
+        COLLATERAL_TOKEN = COLLATERAL_TOKEN_;
+        LIEN_TOKEN = LIEN_TOKEN_;
+        timeBuffer = 15 minutes;
         // extend 15 minutes after every bid made in last 15 minutes
         minBidIncrementPercentage = 5;
         // 5%
@@ -65,17 +67,15 @@ contract AuctionHouse is Auth, IAuctionHouse {
         requiresAuth
         returns (uint256 reserve)
     {
-        uint256[] memory amounts;
-        (reserve, amounts,) = LIEN_TOKEN.stopLiens(tokenId);
+        (reserve,) = LIEN_TOKEN.stopLiens(tokenId);
 
         Auction storage newAuction = auctions[tokenId];
-        newAuction.duration = uint64(duration);
+        newAuction.duration = duration.safeCastTo64();
         newAuction.reservePrice = reserve;
-        newAuction.amounts = amounts;
         newAuction.initiator = initiator;
         newAuction.initiatorFee = initiatorFee;
-        newAuction.firstBidTime = uint64(block.timestamp);
-        newAuction.maxDuration = uint64(duration + 1 days);
+        newAuction.firstBidTime = block.timestamp.safeCastTo64();
+        newAuction.maxDuration = (duration + 1 days).safeCastTo64();
         newAuction.currentBid = 0;
 
         emit AuctionCreated(tokenId, duration, reserve);
@@ -89,22 +89,25 @@ contract AuctionHouse is Auth, IAuctionHouse {
      */
     function createBid(uint256 tokenId, uint256 amount) external override {
         address lastBidder = auctions[tokenId].bidder;
+        uint256 currentBid = auctions[tokenId].currentBid;
+        uint256 duration = auctions[tokenId].duration;
+        uint64 firstBidTime = auctions[tokenId].firstBidTime;
         require(
-            auctions[tokenId].firstBidTime == 0
-                || block.timestamp < auctions[tokenId].firstBidTime + auctions[tokenId].duration,
+            firstBidTime == 0
+                || block.timestamp < firstBidTime + duration,
             "Auction expired"
         );
         require(
-            amount >= auctions[tokenId].currentBid + ((auctions[tokenId].currentBid * minBidIncrementPercentage) / 100),
+            amount > currentBid + ((currentBid * minBidIncrementPercentage) / 100),
             "Must send more than last bid by minBidIncrementPercentage amount"
         );
 
         // If this is the first valid bid, we should set the starting time now.
         // If it's not, then we should refund the last bidder
-        uint256 vaultPayment = (amount - auctions[tokenId].currentBid);
+        uint256 vaultPayment = (amount - currentBid);
 
-        if (auctions[tokenId].firstBidTime == 0) {
-            auctions[tokenId].firstBidTime = uint64(block.timestamp);
+        if (firstBidTime == 0) {
+            auctions[tokenId].firstBidTime = block.timestamp.safeCastTo64();
         } else if (lastBidder != address(0)) {
             uint256 lastBidderRefund = amount - vaultPayment;
             _handleOutGoingPayment(lastBidder, lastBidderRefund);
@@ -119,7 +122,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
         // at this point we know that the timestamp is less than start + duration (since the auction would be over, otherwise)
         // we want to know by how much the timestamp is less than start + duration
         // if the difference is less than the timeBuffer, increase the duration by the timeBuffer
-        if (auctions[tokenId].firstBidTime + auctions[tokenId].duration - block.timestamp < timeBuffer) {
+        if (firstBidTime + duration - block.timestamp < timeBuffer) {
             // Playing code golf for gas optimization:
             // uint256 expectedEnd = auctions[auctionId].firstBidTime.add(auctions[auctionId].duration);
             // uint256 timeRemaining = expectedEnd.sub(block.timestamp);
@@ -127,13 +130,14 @@ contract AuctionHouse is Auth, IAuctionHouse {
             // uint256 newDuration = auctions[auctionId].duration.add(timeToAdd);
 
             //TODO: add the cap to the duration, do not let it extend beyond 24 hours extra from max duration
-            uint256 oldDuration = auctions[tokenId].duration;
-            uint64 newDuration =
-                uint64(oldDuration + (timeBuffer - auctions[tokenId].firstBidTime + oldDuration - block.timestamp));
+            uint64 newDuration = uint256(duration + (block.timestamp + timeBuffer - firstBidTime)).safeCastTo64();
             if (newDuration <= auctions[tokenId].maxDuration) {
                 auctions[tokenId].duration = newDuration;
-                extended = true;
+            } else {
+                auctions[tokenId].duration = auctions[tokenId].maxDuration - firstBidTime;
             }
+            extended = true;
+
         }
 
         emit AuctionBid(
@@ -166,7 +170,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
             winner = auction.bidder;
         }
 
-        emit AuctionEnded(auctionId, auction.bidder, auction.currentBid, auction.recipients);
+        emit AuctionEnded(auctionId, winner, auction.currentBid, auction.recipients);
         LIEN_TOKEN.removeLiens(auctionId);
         delete auctions[auctionId];
     }
@@ -201,24 +205,29 @@ contract AuctionHouse is Auth, IAuctionHouse {
 
         Auction storage auction = auctions[tokenId];
 
-        uint256 initiatorPayment = (transferAmount * auction.initiatorFee) / 100;
+        //fee is in percent
+        //muldiv?
+//        uint256 initiatorPayment = (transferAmount * auction.initiatorFee) / 100;
+        uint256 initiatorPayment = transferAmount.mulDivDown(auction.initiatorFee, 100); //maybe consider making protocl computed like other fees
+
         TRANSFER_PROXY.tokenTransferFrom(weth, payee, auction.initiator, initiatorPayment);
         transferAmount -= initiatorPayment;
 
-        if (auction.amounts.length > 0) {
-            uint256[] memory liens = LIEN_TOKEN.getLiens(tokenId);
-            for (uint256 i = liens.length - auction.amounts.length; i < liens.length; ++i) {
+        uint256[] memory liens = LIEN_TOKEN.getLiens(tokenId);
+
+        if (liens.length > 0) {
+            for (uint256 i = liens.length; i < liens.length; ++i) {
                 uint256 payment;
                 uint256 lienId = liens[i];
 
-                if (transferAmount >= auction.amounts[i]) {
-                    payment = auction.amounts[i];
+                ILienToken.Lien memory lien = LIEN_TOKEN.getLien(lienId);
+
+                if (transferAmount >= lien.amount) {
+                    payment = lien.amount;
                     transferAmount -= payment;
-                    delete auction.amounts[i];
                 } else {
                     payment = transferAmount;
                     transferAmount = 0;
-                    auction.amounts[i] -= payment;
                 }
 
                 if (payment > 0) {

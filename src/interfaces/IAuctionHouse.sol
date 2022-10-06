@@ -13,7 +13,6 @@ interface IAuctionHouse {
         uint64 firstBidTime;
         uint256 reservePrice;
         uint256[] recipients;
-        uint256[] amounts;
         address token;
         address bidder;
         address initiator;
