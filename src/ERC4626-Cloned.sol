@@ -76,10 +76,6 @@ abstract contract ERC20Cloned is Base {
 
     mapping(address => mapping(address => uint256)) public allowance;
 
-    uint256 internal INITIAL_CHAIN_ID;
-
-    bytes32 internal INITIAL_DOMAIN_SEPARATOR;
-
     mapping(address => uint256) public nonces;
 
 
