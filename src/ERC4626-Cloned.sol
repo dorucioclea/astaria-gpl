@@ -10,52 +10,92 @@ import {ERC20} from "solmate/tokens/ERC20.sol";
 /// @author Solmate (https://github.com/Rari-Capital/solmate/blob/main/src/mixins/ERC4626.sol)
 // owner (20) -> underlying (ERC20 address) ,
 
-interface IBase {
+interface ITokenBase {
     function name() external view returns (string memory);
 
     function symbol() external view returns (string memory);
 
-    function owner() external pure returns (address);
-
-    function underlying() external pure returns (address);
 }
 
-abstract contract Base is Clone, IBase {
+interface IERC4646Base is ITokenBase {
+    function underlying() external view returns (address);
+}
+
+interface IAstariaVaultBase is IERC4646Base {
+    function owner() external view returns (address);
+    function COLLATERAL_TOKEN() external view returns (address);
+    function ROUTER() external view returns (address);
+    function AUCTION_HOUSE() external view returns (address);
+    function START() external view returns (uint256);
+    function EPOCH_LENGTH() external view returns (uint256);
+    function VAULT_TYPE() external view returns (uint8);
+    function VAULT_FEE() external view returns (uint256);
+}
+
+
+abstract contract ERC4626Base is Clone, IERC4646Base {
+    function underlying() public view virtual returns (address);
+}
+
+//abstract contract TokenBase is Clone, ITokenCloneBase {
+//    function name() external virtual view returns (string memory);
+//
+//    function symbol() external virtual view returns (string memory);
+//}
+abstract contract WithdrawVaultBase is ERC4626Base {
+    function name() public view virtual returns (string memory);
+
+    function symbol() public view virtual returns (string memory);
+
     function owner() public pure returns (address) {
         return _getArgAddress(0);
     }
 
-    function underlying() public pure returns (address) {
+    function underlying() virtual override(ERC4626Base) public view returns (address) {
         return _getArgAddress(20);
     }
 }
 
-abstract contract VaultBase is Base {
-    function COLLATERAL_TOKEN() public pure returns (address) {
+
+abstract contract AstariaVaultBase is ERC4626Base, IAstariaVaultBase {
+
+    function name() public view virtual returns (string memory);
+
+    function symbol() public view virtual returns (string memory);
+
+    function owner() public pure returns (address) {
+        return _getArgAddress(0);
+    }
+
+    function underlying() virtual override(IERC4646Base, ERC4626Base) public view returns (address) {
+        return _getArgAddress(20);
+    }
+
+    function COLLATERAL_TOKEN() public view returns (address) {
         return _getArgAddress(40);
     }
 
-    function ROUTER() public pure returns (address) {
+    function ROUTER() public view returns (address) {
         return _getArgAddress(60);
     }
 
-    function AUCTION_HOUSE() public pure returns (address) {
+    function AUCTION_HOUSE() public view returns (address) {
         return _getArgAddress(80);
     }
 
-    function START() public pure returns (uint256) {
+    function START() public view returns (uint256) {
         return _getArgUint256(100);
     }
 
-    function EPOCH_LENGTH() public pure returns (uint256) {
+    function EPOCH_LENGTH() public view returns (uint256) {
         return _getArgUint256(132);
     }
 
-    function VAULT_TYPE() public pure returns (uint8) {
+    function VAULT_TYPE() public view returns (uint8) {
         return _getArgUint8(164);
     }
 
-    function VAULT_FEE() public pure returns (uint256) {
+    function VAULT_FEE() public view returns (uint256) {
         return _getArgUint256(172);
     }
 }
@@ -65,7 +105,7 @@ abstract contract VaultBase is Base {
 /// @author Modified from Uniswap (https://github.com/Uniswap/uniswap-v2-core/blob/master/contracts/UniswapV2ERC20.sol)
 /// @dev Do not manually set balances without updating totalSupply, as the sum of all user balances must not exceed it.
 
-abstract contract ERC20Cloned is Base {
+abstract contract ERC20Cloned is ITokenBase {
     event Transfer(address indexed from, address indexed to, uint256 amount);
 
     event Approval(
@@ -195,9 +235,8 @@ abstract contract ERC20Cloned is Base {
             keccak256(
                 abi.encode(
                     keccak256(
-                        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                        "EIP712Domain(string version,uint256 chainId,address verifyingContract)"
                     ),
-                    keccak256(bytes(IBase(address(this)).name())),
                     keccak256("1"),
                     block.chainid,
                     address(this)
@@ -234,7 +273,7 @@ interface IVault {
     function deposit(uint256, address) external returns (uint256);
 }
 
-abstract contract ERC4626Cloned is ERC20Cloned, VaultBase, IVault {
+abstract contract ERC4626Cloned is ERC20Cloned, ERC4626Base, IVault {
     using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
 
