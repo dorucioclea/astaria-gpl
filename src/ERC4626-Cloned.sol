@@ -114,7 +114,7 @@ abstract contract ERC20Cloned is ITokenBase {
         uint256 amount
     );
 
-    uint256 public totalSupply;
+    uint256 _totalSupply;
 
     mapping(address => uint256) public balanceOf;
 
@@ -245,7 +245,7 @@ abstract contract ERC20Cloned is ITokenBase {
     }
 
     function _mint(address to, uint256 amount) internal virtual {
-        totalSupply += amount;
+        _totalSupply += amount;
 
         // Cannot overflow because the sum of all user
         // balances can't exceed the max uint256 value.
@@ -262,7 +262,7 @@ abstract contract ERC20Cloned is ITokenBase {
         // Cannot underflow because a user's balance
         // will never be larger than the total supply.
         unchecked {
-            totalSupply -= amount;
+            _totalSupply -= amount;
         }
 
         emit Transfer(from, address(0), amount);
@@ -292,6 +292,9 @@ abstract contract ERC4626Cloned is ERC20Cloned, ERC4626Base, IVault {
         uint256 shares
     );
 
+    event LogUint(string name, uint256 value);
+    event LogAddress(string name,address);
+
     function deposit(uint256 assets, address receiver)
         public
         virtual
@@ -300,7 +303,10 @@ abstract contract ERC4626Cloned is ERC20Cloned, ERC4626Base, IVault {
     {
         // Check for rounding error since we round down in previewDeposit.
         require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
+        emit LogUint("assets", assets);
+        emit LogUint("shares", shares);
 
+        emit LogAddress("underlying", underlying());
         // Need to transfer before minting or ERC777s could reenter.
         ERC20(underlying()).safeTransferFrom(msg.sender, address(this), assets);
 
@@ -385,7 +391,7 @@ abstract contract ERC4626Cloned is ERC20Cloned, ERC4626Base, IVault {
         virtual
         returns (uint256)
     {
-        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
+        uint256 supply = totalSupply(); // Saves an extra SLOAD if totalSupply is non-zero.
 
         return supply == 0 ? assets : assets.mulDivDown(supply, totalAssets());
     }
@@ -396,7 +402,7 @@ abstract contract ERC4626Cloned is ERC20Cloned, ERC4626Base, IVault {
         virtual
         returns (uint256)
     {
-        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
+        uint256 supply = totalSupply(); // Saves an extra SLOAD if totalSupply is non-zero.
 
         return supply == 0 ? shares : shares.mulDivDown(totalAssets(), supply);
     }
@@ -411,7 +417,7 @@ abstract contract ERC4626Cloned is ERC20Cloned, ERC4626Base, IVault {
     }
 
     function previewMint(uint256 shares) public view virtual returns (uint256) {
-        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
+        uint256 supply = totalSupply(); // Saves an extra SLOAD if totalSupply is non-zero.
 
         return supply == 0 ? shares : shares.mulDivUp(totalAssets(), supply);
     }
@@ -422,9 +428,13 @@ abstract contract ERC4626Cloned is ERC20Cloned, ERC4626Base, IVault {
         virtual
         returns (uint256)
     {
-        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
+        uint256 supply = totalSupply(); // Saves an extra SLOAD if totalSupply is non-zero.
 
         return supply == 0 ? assets : assets.mulDivUp(supply, totalAssets());
+    }
+
+    function totalSupply() public virtual view returns (uint256) {
+        return _totalSupply;
     }
 
     function previewRedeem(uint256 shares)
