@@ -244,13 +244,16 @@ contract AuctionHouse is Auth, IAuctionHouse {
     );
   }
 
+  event PaymentMade(address, uint256);
+  event PaymentAmount(uint256);
+
   /**
    * @dev Given an amount and a currency, transfer the currency to this contract.
    */
   function _handleIncomingPayment(
     uint256 tokenId,
     uint256 transferAmount,
-    address payee
+    address payer
   ) internal {
     require(transferAmount > uint256(0), "cannot send nothing");
 
@@ -266,16 +269,16 @@ contract AuctionHouse is Auth, IAuctionHouse {
 
     TRANSFER_PROXY.tokenTransferFrom(
       weth,
-      payee,
+      payer,
       auction.initiator,
       initiatorPayment
     );
     transferAmount -= initiatorPayment;
 
     uint256[] memory liens = LIEN_TOKEN.getLiens(tokenId);
-
+    uint256 totalLienAmount = 0;
     if (liens.length > 0) {
-      for (uint256 i = liens.length; i < liens.length; ++i) {
+      for (uint256 i = 0; i < liens.length; ++i) {
         uint256 payment;
         uint256 lienId = liens[i];
 
@@ -290,13 +293,13 @@ contract AuctionHouse is Auth, IAuctionHouse {
         }
 
         if (payment > 0) {
-          LIEN_TOKEN.makePayment(lienId, payment, payee);
+          LIEN_TOKEN.makePayment(tokenId, payment, lien.position, payer);
         }
       }
     } else {
       TRANSFER_PROXY.tokenTransferFrom(
         weth,
-        payee,
+        payer,
         COLLATERAL_TOKEN.ownerOf(tokenId),
         transferAmount
       );
