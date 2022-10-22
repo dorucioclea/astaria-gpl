@@ -296,7 +296,8 @@ contract AuctionHouse is Auth, IAuctionHouse {
           LIEN_TOKEN.makePayment(tokenId, payment, lien.position, payer);
         }
       }
-    } else {
+    }
+    if (transferAmount > 0) {
       TRANSFER_PROXY.tokenTransferFrom(
         weth,
         payer,
