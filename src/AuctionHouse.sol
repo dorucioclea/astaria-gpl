@@ -252,11 +252,11 @@ contract AuctionHouse is Auth, IAuctionHouse {
    */
   function _handleIncomingPayment(
     uint256 tokenId,
-    uint256 transferAmount,
+    uint256 incomingPaymentAmount,
     address payer
   ) internal {
-    require(transferAmount > uint256(0), "cannot send nothing");
-
+    require(incomingPaymentAmount > uint256(0), "cannot send nothing");
+    uint256 transferAmount = incomingPaymentAmount;
     Auction storage auction = auctions[tokenId];
 
     //fee is in percent
