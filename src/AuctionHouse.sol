@@ -8,14 +8,14 @@ import {Auth, Authority} from "solmate/auth/Auth.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 import {IAuctionHouse} from "./interfaces/IAuctionHouse.sol";
-import {ITransferProxy} from "./interfaces/ITransferProxy.sol";
+import {ITransferProxy} from "core/interfaces/ITransferProxy.sol";
 
-import "./interfaces/IWETH9.sol";
-import {ILienToken} from "../../../src/interfaces/ILienToken.sol";
-import {ICollateralToken} from "../../../src/interfaces/ICollateralToken.sol";
+import {ILienToken} from "core/interfaces/ILienToken.sol";
+import {ICollateralToken} from "core/interfaces/ICollateralToken.sol";
+import {IAstariaRouter} from "core/interfaces/IAstariaRouter.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {SafeCastLib} from "./utils/SafeCastLib.sol";
-import {PublicVault, IPublicVault} from "../../../src/PublicVault.sol";
+import {PublicVault, IPublicVault} from "core/PublicVault.sol";
 
 contract AuctionHouse is Auth, IAuctionHouse {
   using SafeTransferLib for ERC20;
@@ -30,6 +30,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
   address public weth;
 
   ITransferProxy TRANSFER_PROXY;
+  IAstariaRouter ASTARIA_ROUTER;
   ILienToken LIEN_TOKEN;
   ICollateralToken COLLATERAL_TOKEN;
 
@@ -45,12 +46,14 @@ contract AuctionHouse is Auth, IAuctionHouse {
     Authority AUTHORITY_,
     ICollateralToken COLLATERAL_TOKEN_,
     ILienToken LIEN_TOKEN_,
-    ITransferProxy transferProxy_
+    ITransferProxy TRANSFER_PROXY_,
+    IAstariaRouter ASTARIA_ROUTER_
   ) Auth(msg.sender, Authority(address(AUTHORITY_))) {
     weth = weth_;
-    TRANSFER_PROXY = transferProxy_;
+    TRANSFER_PROXY = TRANSFER_PROXY_;
     COLLATERAL_TOKEN = COLLATERAL_TOKEN_;
     LIEN_TOKEN = LIEN_TOKEN_;
+    ASTARIA_ROUTER = ASTARIA_ROUTER_;
     timeBuffer = 15 minutes;
     // extend 15 minutes after every bid made in last 15 minutes
     minBidIncrementPercentage = 5;
@@ -67,8 +70,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
   function createAuction(
     uint256 tokenId,
     uint256 duration,
-    address initiator,
-    uint256 initiatorFee
+    address initiator
   ) external requiresAuth returns (uint256 reserve) {
     (reserve, ) = LIEN_TOKEN.stopLiens(tokenId);
 
@@ -76,7 +78,6 @@ contract AuctionHouse is Auth, IAuctionHouse {
     newAuction.duration = duration.safeCastTo64();
     newAuction.reservePrice = reserve;
     newAuction.initiator = initiator;
-    newAuction.initiatorFee = initiatorFee;
     newAuction.firstBidTime = block.timestamp.safeCastTo64();
     newAuction.maxDuration = (duration + 1 days).safeCastTo64();
     newAuction.currentBid = 0;
@@ -261,11 +262,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
 
     //fee is in percent
     //muldiv?
-    //        uint256 initiatorPayment = (transferAmount * auction.initiatorFee) / 100;
-    uint256 initiatorPayment = transferAmount.mulDivDown(
-      auction.initiatorFee,
-      100
-    ); //maybe consider making protocl computed like other fees
+    uint256 initiatorPayment = ASTARIA_ROUTER.getLiquidatorFee(transferAmount);
 
     TRANSFER_PROXY.tokenTransferFrom(
       weth,
