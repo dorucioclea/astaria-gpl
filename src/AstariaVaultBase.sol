@@ -25,31 +25,31 @@ abstract contract AstariaVaultBase is ERC4626Base, IAstariaVaultBase {
     return _getArgAddress(20);
   }
 
-  function COLLATERAL_TOKEN() public pure returns (ICollateralToken) {
-    return ICollateralToken(_getArgAddress(40));
-  }
-
   function ROUTER() public pure returns (IAstariaRouter) {
-    return IAstariaRouter(_getArgAddress(60));
-  }
-
-  function AUCTION_HOUSE() public pure returns (IAuctionHouse) {
-    return IAuctionHouse(_getArgAddress(80));
+    return IAstariaRouter(_getArgAddress(40));
   }
 
   function START() public pure returns (uint256) {
-    return _getArgUint256(100);
+    return _getArgUint256(60);
   }
 
   function EPOCH_LENGTH() public pure returns (uint256) {
-    return _getArgUint256(132);
+    return _getArgUint256(92);
   }
 
   function VAULT_TYPE() public pure returns (uint8) {
-    return _getArgUint8(164);
+    return _getArgUint8(124);
   }
 
   function VAULT_FEE() public pure returns (uint256) {
-    return _getArgUint256(172);
+    return _getArgUint256(132);
+  }
+
+  function AUCTION_HOUSE() public view returns (IAuctionHouse) {
+    return ROUTER().COLLATERAL_TOKEN().AUCTION_HOUSE();
+  }
+
+  function COLLATERAL_TOKEN() public view returns (ICollateralToken) {
+    return ROUTER().COLLATERAL_TOKEN();
   }
 }
