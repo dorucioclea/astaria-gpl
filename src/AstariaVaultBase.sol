@@ -1,7 +1,10 @@
 pragma solidity ^0.8.17;
-import {ERC4626Base} from "./ERC4626Base.sol";
 import {IAstariaVaultBase} from "./interfaces/IAstariaVaultBase.sol";
+import {ERC4626Base} from "./ERC4626Base.sol";
 import {IERC4626Base} from "./interfaces/IERC4626Base.sol";
+import {ICollateralToken} from "core/interfaces/ICollateralToken.sol";
+import {IAstariaRouter} from "core/interfaces/IAstariaRouter.sol";
+import {IAuctionHouse} from "gpl/interfaces/IAuctionHouse.sol";
 
 abstract contract AstariaVaultBase is ERC4626Base, IAstariaVaultBase {
   function name() public view virtual returns (string memory);
@@ -22,16 +25,16 @@ abstract contract AstariaVaultBase is ERC4626Base, IAstariaVaultBase {
     return _getArgAddress(20);
   }
 
-  function COLLATERAL_TOKEN() public pure returns (address) {
-    return _getArgAddress(40);
+  function COLLATERAL_TOKEN() public pure returns (ICollateralToken) {
+    return ICollateralToken(_getArgAddress(40));
   }
 
-  function ROUTER() public pure returns (address) {
-    return _getArgAddress(60);
+  function ROUTER() public pure returns (IAstariaRouter) {
+    return IAstariaRouter(_getArgAddress(60));
   }
 
-  function AUCTION_HOUSE() public pure returns (address) {
-    return _getArgAddress(80);
+  function AUCTION_HOUSE() public pure returns (IAuctionHouse) {
+    return IAuctionHouse(_getArgAddress(80));
   }
 
   function START() public pure returns (uint256) {
