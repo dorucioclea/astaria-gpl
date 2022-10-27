@@ -4,21 +4,18 @@ import {IERC4626Base} from "./IERC4626Base.sol";
 import {ICollateralToken} from "core/interfaces/ICollateralToken.sol";
 import {IAstariaRouter} from "core/interfaces/IAstariaRouter.sol";
 import {IAuctionHouse} from "gpl/interfaces/IAuctionHouse.sol";
+import {IRouterBase} from "core/interfaces/IRouterBase.sol";
 
-interface IAstariaVaultBase is IERC4626Base {
+interface IAstariaVaultBase is IERC4626Base, IRouterBase {
   function owner() external view returns (address);
 
   function COLLATERAL_TOKEN() external view returns (ICollateralToken);
-
-  function ROUTER() external view returns (IAstariaRouter);
 
   function AUCTION_HOUSE() external view returns (IAuctionHouse);
 
   function START() external view returns (uint256);
 
   function EPOCH_LENGTH() external view returns (uint256);
-
-  function VAULT_TYPE() external view returns (uint8);
 
   function VAULT_FEE() external view returns (uint256);
 }
