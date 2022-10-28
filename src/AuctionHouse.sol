@@ -70,10 +70,9 @@ contract AuctionHouse is Auth, IAuctionHouse {
   function createAuction(
     uint256 tokenId,
     uint256 duration,
-    address initiator
-  ) external requiresAuth returns (uint256 reserve) {
-    (reserve, ) = LIEN_TOKEN.stopLiens(tokenId);
-
+    address initiator,
+    uint256 reserve
+  ) external requiresAuth {
     Auction storage newAuction = auctions[tokenId];
     newAuction.duration = duration.safeCastTo64();
     newAuction.reservePrice = reserve;
@@ -191,13 +190,15 @@ contract AuctionHouse is Auth, IAuctionHouse {
     uint256[] memory liensRemaining = LIEN_TOKEN.getLiens(auctionId);
 
     for (uint256 i = 0; i < liensRemaining.length; i++) {
-      ILienToken.Lien memory lien = LIEN_TOKEN.getLien(liensRemaining[i]);
+      ILienToken.LienDataPoint memory point = LIEN_TOKEN.getPoint(
+        liensRemaining[i]
+      );
       if (
         PublicVault(LIEN_TOKEN.ownerOf(i)).supportsInterface(
           type(IPublicVault).interfaceId
         )
       ) {
-        PublicVault(LIEN_TOKEN.ownerOf(i)).decreaseYIntercept(lien.amount);
+        PublicVault(LIEN_TOKEN.ownerOf(i)).decreaseYIntercept(point.amount);
       }
     }
     LIEN_TOKEN.removeLiens(auctionId, liensRemaining);
@@ -252,13 +253,13 @@ contract AuctionHouse is Auth, IAuctionHouse {
    * @dev Given an amount and a currency, transfer the currency to this contract.
    */
   function _handleIncomingPayment(
-    uint256 tokenId,
+    uint256 collateralId,
     uint256 incomingPaymentAmount,
     address payer
   ) internal {
     require(incomingPaymentAmount > uint256(0), "cannot send nothing");
     uint256 transferAmount = incomingPaymentAmount;
-    Auction storage auction = auctions[tokenId];
+    Auction storage auction = auctions[collateralId];
 
     //fee is in percent
     //muldiv?
@@ -272,17 +273,19 @@ contract AuctionHouse is Auth, IAuctionHouse {
     );
     transferAmount -= initiatorPayment;
 
-    uint256[] memory liens = LIEN_TOKEN.getLiens(tokenId);
+    uint256[] memory liens = LIEN_TOKEN.getLiens(collateralId);
     uint256 totalLienAmount = 0;
     if (liens.length > 0) {
       for (uint256 i = 0; i < liens.length; ++i) {
         uint256 payment;
-        uint256 lienId = liens[i];
 
-        ILienToken.Lien memory lien = LIEN_TOKEN.getLien(lienId);
+        ILienToken.LienDataPoint memory point = LIEN_TOKEN.getPoint(
+          collateralId,
+          uint8(i)
+        );
 
-        if (transferAmount >= lien.amount) {
-          payment = lien.amount;
+        if (transferAmount >= point.amount) {
+          payment = point.amount;
           transferAmount -= payment;
         } else {
           payment = transferAmount;
@@ -290,7 +293,13 @@ contract AuctionHouse is Auth, IAuctionHouse {
         }
 
         if (payment > 0) {
-          LIEN_TOKEN.makePayment(tokenId, payment, lien.position, payer);
+          LIEN_TOKEN.makePaymentAuctionHouse(
+            liens[i],
+            collateralId,
+            payment,
+            uint8(i),
+            payer
+          );
         }
       }
     }
@@ -298,7 +307,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
       TRANSFER_PROXY.tokenTransferFrom(
         weth,
         payer,
-        COLLATERAL_TOKEN.ownerOf(tokenId),
+        COLLATERAL_TOKEN.ownerOf(collateralId),
         transferAmount
       );
     }
