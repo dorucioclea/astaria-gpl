@@ -12,7 +12,7 @@ interface IAuctionHouse {
     // The time of the first bid
     uint64 firstBidTime;
     uint256 reservePrice;
-    uint256[] recipients;
+    uint256[] stack;
     address token;
     address bidder;
     address initiator;
@@ -42,8 +42,7 @@ interface IAuctionHouse {
   event AuctionEnded(
     uint256 indexed tokenId,
     address winner,
-    uint256 winningBid,
-    uint256[] recipients
+    uint256 winningBid
   );
 
   event AuctionCanceled(uint256 indexed tokenId);
@@ -52,7 +51,8 @@ interface IAuctionHouse {
     uint256 tokenId,
     uint256 duration,
     address initiator,
-    uint256 reserve
+    uint256 reserve,
+    uint256[] calldata stack
   ) external;
 
   function createBid(uint256 tokenId, uint256 amount) external;

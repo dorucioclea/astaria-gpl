@@ -71,10 +71,13 @@ contract AuctionHouse is Auth, IAuctionHouse {
     uint256 tokenId,
     uint256 duration,
     address initiator,
-    uint256 reserve
+    uint256 reserve,
+    uint256[] calldata stack
   ) external requiresAuth {
+    require(!auctionExists(tokenId), "Auction already exists");
     Auction storage newAuction = auctions[tokenId];
     newAuction.duration = duration.safeCastTo64();
+    newAuction.stack = stack;
     newAuction.reservePrice = reserve;
     newAuction.initiator = initiator;
     newAuction.firstBidTime = block.timestamp.safeCastTo64();
@@ -181,17 +184,11 @@ contract AuctionHouse is Auth, IAuctionHouse {
       winner = auction.bidder;
     }
 
-    emit AuctionEnded(
-      auctionId,
-      winner,
-      auction.currentBid,
-      auction.recipients
-    );
-    uint256[] memory liensRemaining = LIEN_TOKEN.getLiens(auctionId);
+    emit AuctionEnded(auctionId, winner, auction.currentBid);
 
-    for (uint256 i = 0; i < liensRemaining.length; i++) {
+    for (uint256 i = 0; i < auction.stack.length; i++) {
       ILienToken.LienDataPoint memory point = LIEN_TOKEN.getPoint(
-        liensRemaining[i]
+        auction.stack[i]
       );
       if (
         PublicVault(LIEN_TOKEN.ownerOf(i)).supportsInterface(
@@ -201,7 +198,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
         PublicVault(LIEN_TOKEN.ownerOf(i)).decreaseYIntercept(point.amount);
       }
     }
-    LIEN_TOKEN.removeLiens(auctionId, liensRemaining);
+    LIEN_TOKEN.removeLiens(auctionId, auction.stack);
     delete auctions[auctionId];
   }
 
@@ -273,15 +270,13 @@ contract AuctionHouse is Auth, IAuctionHouse {
     );
     transferAmount -= initiatorPayment;
 
-    uint256[] memory liens = LIEN_TOKEN.getLiens(collateralId);
     uint256 totalLienAmount = 0;
-    if (liens.length > 0) {
-      for (uint256 i = 0; i < liens.length; ++i) {
+    if (auction.stack.length > 0) {
+      for (uint256 i = 0; i < auction.stack.length; ++i) {
         uint256 payment;
 
         ILienToken.LienDataPoint memory point = LIEN_TOKEN.getPoint(
-          collateralId,
-          uint8(i)
+          auction.stack[i]
         );
 
         if (transferAmount >= point.amount) {
@@ -294,7 +289,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
 
         if (payment > 0) {
           LIEN_TOKEN.makePaymentAuctionHouse(
-            liens[i],
+            auction.stack[i],
             collateralId,
             payment,
             uint8(i),
