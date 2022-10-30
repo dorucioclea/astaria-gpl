@@ -111,14 +111,12 @@ contract AuctionHouse is Auth, IAuctionHouse {
     // If it's not, then we should refund the last bidder
     uint256 vaultPayment = (amount - currentBid);
 
-    if (firstBidTime == 0) {
-      auctions[tokenId].firstBidTime = block.timestamp.safeCastTo64();
-    } else if (lastBidder != address(0)) {
+    if (lastBidder != address(0)) {
       uint256 lastBidderRefund = amount - vaultPayment;
       _handleOutGoingPayment(lastBidder, lastBidderRefund);
     }
 
-    _handleIncomingPayment(tokenId, vaultPayment, address(msg.sender));
+    _handleIncomingPayment(tokenId, vaultPayment, address(msg.sender), false);
 
     auctions[tokenId].currentBid = amount;
     auctions[tokenId].bidder = address(msg.sender);
@@ -210,6 +208,8 @@ contract AuctionHouse is Auth, IAuctionHouse {
     external
     requiresAuth
   {
+    //    require(!auctionExists(auctionId), "Auction does not exist");
+
     require(
       auctions[auctionId].currentBid < auctions[auctionId].reservePrice,
       "cancelAuction: Auction is at or above reserve"
@@ -217,7 +217,8 @@ contract AuctionHouse is Auth, IAuctionHouse {
     _handleIncomingPayment(
       auctionId,
       auctions[auctionId].reservePrice,
-      canceledBy
+      canceledBy,
+      true
     );
     _cancelAuction(auctionId);
   }
@@ -252,15 +253,15 @@ contract AuctionHouse is Auth, IAuctionHouse {
   function _handleIncomingPayment(
     uint256 collateralId,
     uint256 incomingPaymentAmount,
-    address payer
+    address payer,
+    bool isCancel
   ) internal {
     require(incomingPaymentAmount > uint256(0), "cannot send nothing");
     uint256 transferAmount = incomingPaymentAmount;
     Auction storage auction = auctions[collateralId];
 
-    //fee is in percent
-    //muldiv?
-    uint256 initiatorPayment = ASTARIA_ROUTER.getLiquidatorFee(transferAmount);
+    uint256 initiatorPayment;
+    initiatorPayment = ASTARIA_ROUTER.getLiquidatorFee(transferAmount);
 
     TRANSFER_PROXY.tokenTransferFrom(
       weth,
@@ -268,7 +269,9 @@ contract AuctionHouse is Auth, IAuctionHouse {
       auction.initiator,
       initiatorPayment
     );
-    transferAmount -= initiatorPayment;
+    if (!isCancel) {
+      transferAmount -= initiatorPayment;
+    }
 
     uint256 totalLienAmount = 0;
     if (auction.stack.length > 0) {
@@ -292,7 +295,6 @@ contract AuctionHouse is Auth, IAuctionHouse {
             auction.stack[i],
             collateralId,
             payment,
-            uint8(i),
             payer
           );
         }

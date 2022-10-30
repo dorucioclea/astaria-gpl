@@ -47,7 +47,7 @@ abstract contract AstariaVaultBase is ERC4626Base, IAstariaVaultBase {
   }
 
   function AUCTION_HOUSE() public view returns (IAuctionHouse) {
-    return ROUTER().COLLATERAL_TOKEN().AUCTION_HOUSE();
+    return ROUTER().AUCTION_HOUSE();
   }
 
   function COLLATERAL_TOKEN() public view returns (ICollateralToken) {
