@@ -22,9 +22,10 @@ contract AuctionHouse is Auth, IAuctionHouse {
   using SafeCastLib for uint256;
   using FixedPointMathLib for uint256;
   // The minimum amount of time left in an auction after a new bid is created
-  uint256 public timeBuffer;
+  uint32 public timeBuffer;
   // The minimum percentage difference between the last bid amount and the current bid.
-  uint256 public minBidIncrementPercentage;
+  uint32 public minBidIncrementNumerator;
+  uint32 public minBidIncrementDenominator;
 
   // / The address of the WETH contract, so that any ETH transferred can be handled as an ERC-20
   address public weth;
@@ -54,10 +55,12 @@ contract AuctionHouse is Auth, IAuctionHouse {
     COLLATERAL_TOKEN = COLLATERAL_TOKEN_;
     LIEN_TOKEN = LIEN_TOKEN_;
     ASTARIA_ROUTER = ASTARIA_ROUTER_;
-    timeBuffer = 15 minutes;
+    timeBuffer = uint32(15 minutes);
     // extend 15 minutes after every bid made in last 15 minutes
-    minBidIncrementPercentage = 5;
     // 5%
+
+    minBidIncrementNumerator = uint32(50);
+    minBidIncrementDenominator = uint32(1000);
 
     ERC20(weth).safeApprove(address(LIEN_TOKEN), type(uint256).max);
   }
@@ -70,16 +73,18 @@ contract AuctionHouse is Auth, IAuctionHouse {
   function createAuction(
     uint256 tokenId,
     uint256 duration,
-    address initiator
-  ) external requiresAuth returns (uint256 reserve) {
-    (reserve, ) = LIEN_TOKEN.stopLiens(tokenId);
-
+    address initiator,
+    uint256 reserve,
+    uint256[] calldata stack
+  ) external requiresAuth {
+    require(!auctionExists(tokenId), "Auction already exists");
     Auction storage newAuction = auctions[tokenId];
-    newAuction.duration = duration.safeCastTo64();
-    newAuction.reservePrice = reserve;
+    newAuction.duration = duration.safeCastTo40();
+    newAuction.stack = stack;
+    newAuction.reservePrice = reserve.safeCastTo88();
     newAuction.initiator = initiator;
-    newAuction.firstBidTime = block.timestamp.safeCastTo64();
-    newAuction.maxDuration = (duration + 1 days).safeCastTo64();
+    newAuction.firstBidTime = block.timestamp.safeCastTo40();
+    newAuction.maxDuration = (duration + 1 days).safeCastTo40();
     newAuction.currentBid = 0;
 
     emit AuctionCreated(tokenId, duration, reserve);
@@ -95,13 +100,16 @@ contract AuctionHouse is Auth, IAuctionHouse {
     address lastBidder = auctions[tokenId].bidder;
     uint256 currentBid = auctions[tokenId].currentBid;
     uint256 duration = auctions[tokenId].duration;
-    uint64 firstBidTime = auctions[tokenId].firstBidTime;
+    uint40 firstBidTime = auctions[tokenId].firstBidTime;
     require(
       firstBidTime == 0 || block.timestamp < firstBidTime + duration,
       "Auction expired"
     );
     require(
-      amount > currentBid + ((currentBid * minBidIncrementPercentage) / 100),
+      amount >
+        currentBid +
+          ((currentBid * minBidIncrementNumerator) /
+            minBidIncrementDenominator),
       "Must send more than last bid by minBidIncrementPercentage amount"
     );
 
@@ -109,14 +117,12 @@ contract AuctionHouse is Auth, IAuctionHouse {
     // If it's not, then we should refund the last bidder
     uint256 vaultPayment = (amount - currentBid);
 
-    if (firstBidTime == 0) {
-      auctions[tokenId].firstBidTime = block.timestamp.safeCastTo64();
-    } else if (lastBidder != address(0)) {
+    if (lastBidder != address(0)) {
       uint256 lastBidderRefund = amount - vaultPayment;
       _handleOutGoingPayment(lastBidder, lastBidderRefund);
     }
 
-    _handleIncomingPayment(tokenId, vaultPayment, address(msg.sender));
+    _handleIncomingPayment(tokenId, vaultPayment, address(msg.sender), false);
 
     auctions[tokenId].currentBid = amount;
     auctions[tokenId].bidder = address(msg.sender);
@@ -132,10 +138,9 @@ contract AuctionHouse is Auth, IAuctionHouse {
       // uint256 timeToAdd = timeBuffer.sub(timeRemaining);
       // uint256 newDuration = auctions[auctionId].duration.add(timeToAdd);
 
-      //TODO: add the cap to the duration, do not let it extend beyond 24 hours extra from max duration
-      uint64 newDuration = uint256(
+      uint40 newDuration = uint256(
         duration + (block.timestamp + timeBuffer - firstBidTime)
-      ).safeCastTo64();
+      ).safeCastTo40();
       if (newDuration <= auctions[tokenId].maxDuration) {
         auctions[tokenId].duration = newDuration;
       } else {
@@ -175,6 +180,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
         auctions[auctionId].firstBidTime + auctions[auctionId].duration,
       "Auction hasn't completed"
     );
+
     Auction storage auction = auctions[auctionId];
     if (auction.bidder == address(0)) {
       winner = auction.initiator;
@@ -182,25 +188,11 @@ contract AuctionHouse is Auth, IAuctionHouse {
       winner = auction.bidder;
     }
 
-    emit AuctionEnded(
-      auctionId,
-      winner,
-      auction.currentBid,
-      auction.recipients
-    );
-    uint256[] memory liensRemaining = LIEN_TOKEN.getLiens(auctionId);
-
-    for (uint256 i = 0; i < liensRemaining.length; i++) {
-      ILienToken.Lien memory lien = LIEN_TOKEN.getLien(liensRemaining[i]);
-      if (
-        PublicVault(LIEN_TOKEN.ownerOf(i)).supportsInterface(
-          type(IPublicVault).interfaceId
-        )
-      ) {
-        PublicVault(LIEN_TOKEN.ownerOf(i)).decreaseYIntercept(lien.amount);
-      }
+    emit AuctionEnded(auctionId, winner, auction.currentBid);
+    if (auction.stack.length > 0) {
+      //TODO: make sure this check doesn't break something
+      LIEN_TOKEN.removeLiens(auctionId, auction.stack);
     }
-    LIEN_TOKEN.removeLiens(auctionId, liensRemaining);
     delete auctions[auctionId];
   }
 
@@ -212,6 +204,8 @@ contract AuctionHouse is Auth, IAuctionHouse {
     external
     requiresAuth
   {
+    require(auctionExists(auctionId), "Auction does not exist");
+
     require(
       auctions[auctionId].currentBid < auctions[auctionId].reservePrice,
       "cancelAuction: Auction is at or above reserve"
@@ -219,7 +213,8 @@ contract AuctionHouse is Auth, IAuctionHouse {
     _handleIncomingPayment(
       auctionId,
       auctions[auctionId].reservePrice,
-      canceledBy
+      canceledBy,
+      true
     );
     _cancelAuction(auctionId);
   }
@@ -245,23 +240,19 @@ contract AuctionHouse is Auth, IAuctionHouse {
     );
   }
 
-  event PaymentMade(address, uint256);
-  event PaymentAmount(uint256);
-
   /**
    * @dev Given an amount and a currency, transfer the currency to this contract.
    */
   function _handleIncomingPayment(
-    uint256 tokenId,
+    uint256 collateralId,
     uint256 incomingPaymentAmount,
-    address payer
+    address payer,
+    bool isCancel
   ) internal {
     require(incomingPaymentAmount > uint256(0), "cannot send nothing");
     uint256 transferAmount = incomingPaymentAmount;
-    Auction storage auction = auctions[tokenId];
+    Auction storage auction = auctions[collateralId];
 
-    //fee is in percent
-    //muldiv?
     uint256 initiatorPayment = ASTARIA_ROUTER.getLiquidatorFee(transferAmount);
 
     TRANSFER_PROXY.tokenTransferFrom(
@@ -270,35 +261,30 @@ contract AuctionHouse is Auth, IAuctionHouse {
       auction.initiator,
       initiatorPayment
     );
-    transferAmount -= initiatorPayment;
+    if (!isCancel) {
+      unchecked {
+        transferAmount -= initiatorPayment;
+      }
+    }
 
-    uint256[] memory liens = LIEN_TOKEN.getLiens(tokenId);
-    uint256 totalLienAmount = 0;
-    if (liens.length > 0) {
-      for (uint256 i = 0; i < liens.length; ++i) {
-        uint256 payment;
-        uint256 lienId = liens[i];
-
-        ILienToken.Lien memory lien = LIEN_TOKEN.getLien(lienId);
-
-        if (transferAmount >= lien.amount) {
-          payment = lien.amount;
-          transferAmount -= payment;
-        } else {
-          payment = transferAmount;
-          transferAmount = 0;
-        }
-
-        if (payment > 0) {
-          LIEN_TOKEN.makePayment(tokenId, payment, lien.position, payer);
-        }
+    if (auction.stack.length > 0 && transferAmount > 0) {
+      (uint256[] memory newStack, uint256 spent) = LIEN_TOKEN
+        .makePaymentAuctionHouse(
+          auction.stack,
+          collateralId,
+          transferAmount,
+          payer
+        );
+      unchecked {
+        transferAmount -= spent;
+        auction.stack = newStack;
       }
     }
     if (transferAmount > 0) {
       TRANSFER_PROXY.tokenTransferFrom(
         weth,
         payer,
-        COLLATERAL_TOKEN.ownerOf(tokenId),
+        COLLATERAL_TOKEN.ownerOf(collateralId),
         transferAmount
       );
     }

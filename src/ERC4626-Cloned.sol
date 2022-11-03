@@ -5,11 +5,11 @@ import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {Clone} from "clones-with-immutable-args/Clone.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
-import {IAstariaVaultBase} from "./interfaces/IAstariaVaultBase.sol";
-import {ITokenBase} from "./interfaces/ITokenBase.sol";
-import {ERC20Cloned} from "./ERC20-Cloned.sol";
-import {IVault} from "./interfaces/IVault.sol";
-import {ERC4626Base} from "./ERC4626Base.sol";
+import {IAstariaVaultBase} from "core/interfaces/IAstariaVaultBase.sol";
+import {ITokenBase} from "core/interfaces/ITokenBase.sol";
+import {ERC20Cloned} from "gpl/ERC20-Cloned.sol";
+import {IVault} from "core/interfaces/IVault.sol";
+import {ERC4626Base} from "core/ERC4626Base.sol";
 
 abstract contract ERC4626Cloned is ERC20Cloned, ERC4626Base, IVault {
   using SafeTransferLib for ERC20;
@@ -73,11 +73,12 @@ abstract contract ERC4626Cloned is ERC20Cloned, ERC4626Base, IVault {
   ) public virtual returns (uint256 shares) {
     shares = previewWithdraw(assets); // No need to check for rounding error, previewWithdraw rounds up.
 
+    ERC20Data storage s = _loadERC20Slot();
     if (msg.sender != owner) {
-      uint256 allowed = allowance[owner][msg.sender]; // Saves gas for limited approvals.
+      uint256 allowed = s.allowance[owner][msg.sender]; // Saves gas for limited approvals.
 
       if (allowed != type(uint256).max) {
-        allowance[owner][msg.sender] = allowed - shares;
+        s.allowance[owner][msg.sender] = allowed - shares;
       }
     }
 
@@ -95,11 +96,12 @@ abstract contract ERC4626Cloned is ERC20Cloned, ERC4626Base, IVault {
     address receiver,
     address owner
   ) public virtual returns (uint256 assets) {
+    ERC20Data storage s = _loadERC20Slot();
     if (msg.sender != owner) {
-      uint256 allowed = allowance[owner][msg.sender]; // Saves gas for limited approvals.
+      uint256 allowed = s.allowance[owner][msg.sender]; // Saves gas for limited approvals.
 
       if (allowed != type(uint256).max) {
-        allowance[owner][msg.sender] = allowed - shares;
+        s.allowance[owner][msg.sender] = allowed - shares;
       }
     }
 
@@ -165,10 +167,6 @@ abstract contract ERC4626Cloned is ERC20Cloned, ERC4626Base, IVault {
     return supply == 0 ? assets : assets.mulDivUp(supply, totalAssets());
   }
 
-  function totalSupply() public view virtual returns (uint256) {
-    return _totalSupply;
-  }
-
   function previewRedeem(uint256 shares) public view virtual returns (uint256) {
     return convertToAssets(shares);
   }
@@ -182,11 +180,13 @@ abstract contract ERC4626Cloned is ERC20Cloned, ERC4626Base, IVault {
   }
 
   function maxWithdraw(address owner) public view virtual returns (uint256) {
-    return convertToAssets(balanceOf[owner]);
+    ERC20Data storage s = _loadERC20Slot();
+    return convertToAssets(s.balanceOf[owner]);
   }
 
   function maxRedeem(address owner) public view virtual returns (uint256) {
-    return balanceOf[owner];
+    ERC20Data storage s = _loadERC20Slot();
+    return s.balanceOf[owner];
   }
 
   function beforeWithdraw(uint256 assets, uint256 shares) internal virtual {}

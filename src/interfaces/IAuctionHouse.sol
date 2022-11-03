@@ -5,17 +5,17 @@ pragma experimental ABIEncoderV2;
 interface IAuctionHouse {
   struct Auction {
     // The current highest bid amount
-    uint256 currentBid;
-    // The length of time to run the auction for, after the first bid was made
-    uint64 duration;
-    uint64 maxDuration;
-    // The time of the first bid
-    uint64 firstBidTime;
-    uint256 reservePrice;
-    uint256[] recipients;
     address token;
-    address bidder;
     address initiator;
+    uint40 duration;
+    uint40 maxDuration;
+    uint40 firstBidTime;
+    uint88 reservePrice;
+    // The length of time to run the auction for, after the first bid was made
+    address bidder;
+    uint256 currentBid;
+    uint256[] stack;
+    // The time of the first bid
   }
 
   event AuctionCreated(
@@ -42,8 +42,7 @@ interface IAuctionHouse {
   event AuctionEnded(
     uint256 indexed tokenId,
     address winner,
-    uint256 winningBid,
-    uint256[] recipients
+    uint256 winningBid
   );
 
   event AuctionCanceled(uint256 indexed tokenId);
@@ -51,8 +50,10 @@ interface IAuctionHouse {
   function createAuction(
     uint256 tokenId,
     uint256 duration,
-    address initiator
-  ) external returns (uint256);
+    address initiator,
+    uint256 reserve,
+    uint256[] calldata stack
+  ) external;
 
   function createBid(uint256 tokenId, uint256 amount) external;
 

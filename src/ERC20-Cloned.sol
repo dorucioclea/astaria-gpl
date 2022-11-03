@@ -1,36 +1,42 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity >=0.8.16;
 
-import {ITokenBase} from "./interfaces/ITokenBase.sol";
+import {ITokenBase} from "core/interfaces/ITokenBase.sol";
+import {IERC20} from "core/interfaces/IERC20.sol";
 
 /// @notice Modern and gas efficient ERC20 + EIP-2612 implementation.
 /// @author Solmate (https://github.com/Rari-Capital/solmate/blob/main/src/tokens/ERC20.sol)
 /// @author Modified from Uniswap (https://github.com/Uniswap/uniswap-v2-core/blob/master/contracts/UniswapV2ERC20.sol)
 /// @dev Do not manually set balances without updating totalSupply, as the sum of all user balances must not exceed it.
 
-abstract contract ERC20Cloned is ITokenBase {
-  event Transfer(address indexed from, address indexed to, uint256 amount);
+abstract contract ERC20Cloned is ITokenBase, IERC20 {
+  bytes32 constant ERC20_SLOT = keccak256("xyz.astaria.ERC20.storage.location");
 
-  event Approval(
-    address indexed owner,
-    address indexed spender,
-    uint256 amount
-  );
+  struct ERC20Data {
+    uint256 _totalSupply;
+    mapping(address => uint256) balanceOf;
+    mapping(address => mapping(address => uint256)) allowance;
+    mapping(address => uint256) nonces;
+  }
 
-  uint256 _totalSupply;
+  function _loadERC20Slot() internal pure returns (ERC20Data storage s) {
+    bytes32 slot = ERC20_SLOT;
+    assembly {
+      s.slot := slot
+    }
+  }
 
-  mapping(address => uint256) public balanceOf;
-
-  mapping(address => mapping(address => uint256)) public allowance;
-
-  mapping(address => uint256) public nonces;
+  function balanceOf(address account) external view returns (uint256) {
+    return _loadERC20Slot().balanceOf[account];
+  }
 
   function approve(address spender, uint256 amount)
     public
     virtual
     returns (bool)
   {
-    allowance[msg.sender][spender] = amount;
+    ERC20Data storage s = _loadERC20Slot();
+    s.allowance[msg.sender][spender] = amount;
 
     emit Approval(msg.sender, spender, amount);
 
@@ -38,12 +44,13 @@ abstract contract ERC20Cloned is ITokenBase {
   }
 
   function transfer(address to, uint256 amount) public virtual returns (bool) {
-    balanceOf[msg.sender] -= amount;
+    ERC20Data storage s = _loadERC20Slot();
+    s.balanceOf[msg.sender] -= amount;
 
     // Cannot overflow because the sum of all user
     // balances can't exceed the max uint256 value.
     unchecked {
-      balanceOf[to] += amount;
+      s.balanceOf[to] += amount;
     }
 
     emit Transfer(msg.sender, to, amount);
@@ -51,23 +58,38 @@ abstract contract ERC20Cloned is ITokenBase {
     return true;
   }
 
+  function allowance(address owner, address spender)
+    external
+    view
+    returns (uint256)
+  {
+    ERC20Data storage s = _loadERC20Slot();
+    return s.allowance[owner][spender];
+  }
+
+  function totalSupply() public view virtual returns (uint256) {
+    ERC20Data storage s = _loadERC20Slot();
+    return s._totalSupply;
+  }
+
   function transferFrom(
     address from,
     address to,
     uint256 amount
   ) public virtual returns (bool) {
-    uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
+    ERC20Data storage s = _loadERC20Slot();
+    uint256 allowed = s.allowance[from][msg.sender]; // Saves gas for limited approvals.
 
     if (allowed != type(uint256).max) {
-      allowance[from][msg.sender] = allowed - amount;
+      s.allowance[from][msg.sender] = allowed - amount;
     }
 
-    balanceOf[from] -= amount;
+    s.balanceOf[from] -= amount;
 
     // Cannot overflow because the sum of all user
     // balances can't exceed the max uint256 value.
     unchecked {
-      balanceOf[to] += amount;
+      s.balanceOf[to] += amount;
     }
 
     emit Transfer(from, to, amount);
@@ -88,6 +110,7 @@ abstract contract ERC20Cloned is ITokenBase {
 
     // Unchecked because the only math done is incrementing
     // the owner's nonce which cannot realistically overflow.
+
     unchecked {
       address recoveredAddress = ecrecover(
         keccak256(
@@ -102,7 +125,7 @@ abstract contract ERC20Cloned is ITokenBase {
                 owner,
                 spender,
                 value,
-                nonces[owner]++,
+                _loadERC20Slot().nonces[owner]++,
                 deadline
               )
             )
@@ -118,7 +141,7 @@ abstract contract ERC20Cloned is ITokenBase {
         "INVALID_SIGNER"
       );
 
-      allowance[recoveredAddress][spender] = value;
+      _loadERC20Slot().allowance[recoveredAddress][spender] = value;
     }
 
     emit Approval(owner, spender, value);
@@ -143,24 +166,26 @@ abstract contract ERC20Cloned is ITokenBase {
   }
 
   function _mint(address to, uint256 amount) internal virtual {
-    _totalSupply += amount;
+    ERC20Data storage s = _loadERC20Slot();
+    s._totalSupply += amount;
 
     // Cannot overflow because the sum of all user
     // balances can't exceed the max uint256 value.
     unchecked {
-      balanceOf[to] += amount;
+      s.balanceOf[to] += amount;
     }
 
     emit Transfer(address(0), to, amount);
   }
 
   function _burn(address from, uint256 amount) internal virtual {
-    balanceOf[from] -= amount;
+    ERC20Data storage s = _loadERC20Slot();
+    s.balanceOf[from] -= amount;
 
     // Cannot underflow because a user's balance
     // will never be larger than the total supply.
     unchecked {
-      _totalSupply -= amount;
+      s._totalSupply -= amount;
     }
 
     emit Transfer(from, address(0), amount);
