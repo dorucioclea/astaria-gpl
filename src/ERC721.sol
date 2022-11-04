@@ -6,70 +6,88 @@ import {IERC721} from "core/interfaces/IERC721.sol";
 /// @notice Modern, minimalist, and gas efficient ERC-721 implementation.
 /// @author Solmate (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC721.sol)
 abstract contract ERC721 is IERC721 {
-  /*//////////////////////////////////////////////////////////////
-METADATA STORAGE/LOGIC
-//////////////////////////////////////////////////////////////*/
+  /* //////////////////////////////////////////////////////////////
+    METADATA STORAGE/LOGIC
+  ////////////////////////////////////////////////////////////// */
 
-  string public name;
+  bytes32 constant ERC721_SLOT =
+    keccak256("xyz.astaria.ERC721.storage.location");
+  struct ERC721Storage {
+    string name;
+    string symbol;
+    mapping(uint256 => address) _ownerOf;
+    mapping(address => uint256) _balanceOf;
+    mapping(uint256 => address) getApproved;
+    mapping(address => mapping(address => bool)) isApprovedForAll;
+  }
 
-  string public symbol;
+  function getApproved(uint256 tokenId) public view returns (address) {
+    return _loadERC721Slot().getApproved[tokenId];
+  }
+
+  function isApprovedForAll(address owner, address operator)
+    public
+    view
+    returns (bool)
+  {
+    return _loadERC721Slot().isApprovedForAll[owner][operator];
+  }
 
   function tokenURI(uint256 id) external view virtual returns (string memory);
 
-  /*//////////////////////////////////////////////////////////////
-ERC721 BALANCE/OWNER STORAGE
-//////////////////////////////////////////////////////////////*/
+  /* //////////////////////////////////////////////////////////////
+    ERC721 BALANCE/OWNER STORAGE
+  ////////////////////////////////////////////////////////////// */
 
-  mapping(uint256 => address) internal _ownerOf;
-
-  mapping(address => uint256) internal _balanceOf;
+  function _loadERC721Slot() internal pure returns (ERC721Storage storage s) {
+    bytes32 slot = ERC721_SLOT;
+    assembly {
+      s.slot := slot
+    }
+  }
 
   function ownerOf(uint256 id) public view virtual returns (address owner) {
-    require((owner = _ownerOf[id]) != address(0), "NOT_MINTED");
+    require(
+      (owner = _loadERC721Slot()._ownerOf[id]) != address(0),
+      "NOT_MINTED"
+    );
   }
 
   function balanceOf(address owner) public view virtual returns (uint256) {
     require(owner != address(0), "ZERO_ADDRESS");
 
-    return _balanceOf[owner];
+    return _loadERC721Slot()._balanceOf[owner];
   }
 
-  /*//////////////////////////////////////////////////////////////
-ERC721 APPROVAL STORAGE
-//////////////////////////////////////////////////////////////*/
-
-  mapping(uint256 => address) public getApproved;
-
-  mapping(address => mapping(address => bool)) public isApprovedForAll;
-
-  /*//////////////////////////////////////////////////////////////
-CONSTRUCTOR
-//////////////////////////////////////////////////////////////*/
+  /* //////////////////////////////////////////////////////////////
+  CONSTRUCTOR
+  ////////////////////////////////////////////////////////////// */
 
   constructor(string memory _name, string memory _symbol) {
-    name = _name;
-    symbol = _symbol;
+    ERC721Storage storage s = _loadERC721Slot();
+    s.name = _name;
+    s.symbol = _symbol;
   }
 
-  /*//////////////////////////////////////////////////////////////
-ERC721 LOGIC
-//////////////////////////////////////////////////////////////*/
+  /* //////////////////////////////////////////////////////////////
+  ERC721 LOGIC
+  ////////////////////////////////////////////////////////////// */
 
   function approve(address spender, uint256 id) external virtual {
-    address owner = _ownerOf[id];
-
+    ERC721Storage storage s = _loadERC721Slot();
+    address owner = s._ownerOf[id];
     require(
-      msg.sender == owner || isApprovedForAll[owner][msg.sender],
+      msg.sender == owner || s.isApprovedForAll[owner][msg.sender],
       "NOT_AUTHORIZED"
     );
 
-    getApproved[id] = spender;
+    s.getApproved[id] = spender;
 
     emit Approval(owner, spender, id);
   }
 
   function setApprovalForAll(address operator, bool approved) external virtual {
-    isApprovedForAll[msg.sender][operator] = approved;
+    _loadERC721Slot().isApprovedForAll[msg.sender][operator] = approved;
 
     emit ApprovalForAll(msg.sender, operator, approved);
   }
@@ -79,14 +97,16 @@ ERC721 LOGIC
     address to,
     uint256 id
   ) public override(IERC721) {
-    require(from == _ownerOf[id], "WRONG_FROM");
+    ERC721Storage storage s = _loadERC721Slot();
+
+    require(from == s._ownerOf[id], "WRONG_FROM");
 
     require(to != address(0), "INVALID_RECIPIENT");
 
     require(
       msg.sender == from ||
-        isApprovedForAll[from][msg.sender] ||
-        msg.sender == getApproved[id],
+        s.isApprovedForAll[from][msg.sender] ||
+        msg.sender == s.getApproved[id],
       "NOT_AUTHORIZED"
     );
     _transfer(from, to, id);
@@ -99,15 +119,17 @@ ERC721 LOGIC
   ) internal {
     // Underflow of the sender's balance is impossible because we check for
     // ownership above and the recipient's balance can't realistically overflow.
-    unchecked {
-      _balanceOf[from]--;
+    ERC721Storage storage s = _loadERC721Slot();
 
-      _balanceOf[to]++;
+    unchecked {
+      s._balanceOf[from]--;
+
+      s._balanceOf[to]++;
     }
 
-    _ownerOf[id] = to;
+    s._ownerOf[id] = to;
 
-    delete getApproved[id];
+    delete s.getApproved[id];
 
     emit Transfer(from, to, id);
   }
@@ -143,9 +165,9 @@ ERC721 LOGIC
     );
   }
 
-  /*//////////////////////////////////////////////////////////////
-ERC165 LOGIC
-//////////////////////////////////////////////////////////////*/
+  /* //////////////////////////////////////////////////////////////
+  ERC165 LOGIC
+  ////////////////////////////////////////////////////////////// */
 
   function supportsInterface(bytes4 interfaceId)
     public
@@ -159,45 +181,47 @@ ERC165 LOGIC
       interfaceId == 0x5b5e139f; // ERC165 Interface ID for ERC721Metadata
   }
 
-  /*//////////////////////////////////////////////////////////////
-INTERNAL MINT/BURN LOGIC
-//////////////////////////////////////////////////////////////*/
+  /* //////////////////////////////////////////////////////////////
+  INTERNAL MINT/BURN LOGIC
+  ////////////////////////////////////////////////////////////// */
 
   function _mint(address to, uint256 id) internal virtual {
     require(to != address(0), "INVALID_RECIPIENT");
-
-    require(_ownerOf[id] == address(0), "ALREADY_MINTED");
+    ERC721Storage storage s = _loadERC721Slot();
+    require(s._ownerOf[id] == address(0), "ALREADY_MINTED");
 
     // Counter overflow is incredibly unrealistic.
     unchecked {
-      _balanceOf[to]++;
+      s._balanceOf[to]++;
     }
 
-    _ownerOf[id] = to;
+    s._ownerOf[id] = to;
 
     emit Transfer(address(0), to, id);
   }
 
   function _burn(uint256 id) internal virtual {
-    address owner = _ownerOf[id];
+    ERC721Storage storage s = _loadERC721Slot();
+
+    address owner = s._ownerOf[id];
 
     require(owner != address(0), "NOT_MINTED");
 
     // Ownership check above ensures no underflow.
     unchecked {
-      _balanceOf[owner]--;
+      s._balanceOf[owner]--;
     }
 
-    delete _ownerOf[id];
+    delete s._ownerOf[id];
 
-    delete getApproved[id];
+    delete s.getApproved[id];
 
     emit Transfer(owner, address(0), id);
   }
 
-  /*//////////////////////////////////////////////////////////////
-INTERNAL SAFE MINT LOGIC
-//////////////////////////////////////////////////////////////*/
+  /* //////////////////////////////////////////////////////////////
+  INTERNAL SAFE MINT LOGIC
+  ////////////////////////////////////////////////////////////// */
 
   function _safeMint(address to, uint256 id) internal virtual {
     _mint(to, id);
