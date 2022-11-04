@@ -24,11 +24,6 @@ interface IAuctionHouse {
     uint256 reservePrice
   );
 
-  event AuctionReservePriceUpdated(
-    uint256 indexed tokenId,
-    uint256 reservePrice
-  );
-
   event AuctionBid(
     uint256 indexed tokenId,
     address sender,
