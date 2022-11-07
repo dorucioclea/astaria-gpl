@@ -74,6 +74,8 @@ contract AuctionHouse is Auth, IAuctionHouse {
     uint256 tokenId,
     uint256 duration,
     address initiator,
+    uint256 initiatorFeeNumerator,
+    uint256 initiatorFeeDenominator,
     uint256 reserve,
     uint256[] calldata stack
   ) external requiresAuth {
@@ -83,6 +85,8 @@ contract AuctionHouse is Auth, IAuctionHouse {
     newAuction.stack = stack;
     newAuction.reservePrice = reserve.safeCastTo88();
     newAuction.initiator = initiator;
+    newAuction.initiatorFeeNumerator = uint40(initiatorFeeNumerator);
+    newAuction.initiatorFeeDenominator = uint40(initiatorFeeDenominator);
     newAuction.firstBidTime = block.timestamp.safeCastTo40();
     newAuction.maxDuration = (duration + 1 days).safeCastTo40();
     newAuction.currentBid = 0;
@@ -119,10 +123,32 @@ contract AuctionHouse is Auth, IAuctionHouse {
 
     if (lastBidder != address(0)) {
       uint256 lastBidderRefund = amount - vaultPayment;
-      _handleOutGoingPayment(lastBidder, lastBidderRefund);
+      _handleOutGoingPayment(lastBidder, lastBidderRefund, address(msg.sender));
     }
+    uint256 initiatorPayment = vaultPayment.mulDivDown(
+      auctions[tokenId].initiatorFeeNumerator,
+      auctions[tokenId].initiatorFeeDenominator
+    );
+    _handleOutGoingPayment(
+      auctions[tokenId].initiator,
+      initiatorPayment,
+      address(msg.sender)
+    );
+    uint256 incomingPayment = vaultPayment - initiatorPayment;
+    incomingPayment -= _handleIncomingPayment(
+      tokenId,
+      incomingPayment,
+      address(msg.sender)
+    );
 
-    _handleIncomingPayment(tokenId, vaultPayment, address(msg.sender), false);
+    if (incomingPayment > 0) {
+      TRANSFER_PROXY.tokenTransferFrom(
+        weth,
+        address(msg.sender),
+        COLLATERAL_TOKEN.ownerOf(tokenId),
+        incomingPayment
+      );
+    }
 
     auctions[tokenId].currentBid = amount;
     auctions[tokenId].bidder = address(msg.sender);
@@ -169,12 +195,9 @@ contract AuctionHouse is Auth, IAuctionHouse {
    * @dev If for some reason the auction cannot be finalized (invalid token recipient, for example),
    * The auction is reset and the NFT is transferred back to the auction creator.
    */
-  function endAuction(uint256 auctionId)
-    external
-    override
-    requiresAuth
-    returns (address winner)
-  {
+  function endAuction(
+    uint256 auctionId
+  ) external override requiresAuth returns (address winner) {
     require(
       block.timestamp >=
         auctions[auctionId].firstBidTime + auctions[auctionId].duration,
@@ -200,26 +223,42 @@ contract AuctionHouse is Auth, IAuctionHouse {
    * @notice Cancel an auction.
    * @dev Transfers the NFT back to the auction creator and emits an AuctionCanceled event
    */
-  function cancelAuction(uint256 auctionId, address canceledBy)
-    external
-    requiresAuth
-  {
+  function cancelAuction(
+    uint256 auctionId,
+    address canceledBy
+  ) external requiresAuth {
     require(auctionExists(auctionId), "Auction does not exist");
-
+    uint256 transferAmount = auctions[auctionId].reservePrice;
     require(
       auctions[auctionId].currentBid < auctions[auctionId].reservePrice,
       "cancelAuction: Auction is at or above reserve"
     );
-    _handleIncomingPayment(
+    address lastBidder = auctions[auctionId].bidder;
+    if (lastBidder != address(0)) {
+      _handleOutGoingPayment(
+        lastBidder,
+        auctions[auctionId].currentBid,
+        canceledBy
+      );
+      transferAmount -= auctions[auctionId].currentBid;
+    }
+
+    transferAmount -= _handleIncomingPayment(
       auctionId,
-      auctions[auctionId].reservePrice,
-      canceledBy,
-      true
+      transferAmount,
+      canceledBy
+    );
+    _handleOutGoingPayment(
+      auctions[auctionId].initiator,
+      transferAmount,
+      canceledBy
     );
     _cancelAuction(auctionId);
   }
 
-  function getAuctionData(uint256 _auctionId)
+  function getAuctionData(
+    uint256 _auctionId
+  )
     public
     view
     returns (
@@ -245,30 +284,14 @@ contract AuctionHouse is Auth, IAuctionHouse {
    */
   function _handleIncomingPayment(
     uint256 collateralId,
-    uint256 incomingPaymentAmount,
-    address payer,
-    bool isCancel
-  ) internal {
-    require(incomingPaymentAmount > uint256(0), "cannot send nothing");
-    uint256 transferAmount = incomingPaymentAmount;
+    uint256 transferAmount,
+    address payer
+  ) internal returns (uint256 spent) {
+    require(transferAmount > uint256(0), "cannot send nothing");
     Auction storage auction = auctions[collateralId];
 
-    uint256 initiatorPayment = ASTARIA_ROUTER.getLiquidatorFee(transferAmount);
-
-    TRANSFER_PROXY.tokenTransferFrom(
-      weth,
-      payer,
-      auction.initiator,
-      initiatorPayment
-    );
-    if (!isCancel) {
-      unchecked {
-        transferAmount -= initiatorPayment;
-      }
-    }
-
     if (auction.stack.length > 0 && transferAmount > 0) {
-      (uint256[] memory newStack, uint256 spent) = LIEN_TOKEN
+      (uint256[] memory newStack, uint256 outcomeSpent) = LIEN_TOKEN
         .makePaymentAuctionHouse(
           auction.stack,
           collateralId,
@@ -276,22 +299,18 @@ contract AuctionHouse is Auth, IAuctionHouse {
           payer
         );
       unchecked {
-        transferAmount -= spent;
+        spent = outcomeSpent;
         auction.stack = newStack;
       }
     }
-    if (transferAmount > 0) {
-      TRANSFER_PROXY.tokenTransferFrom(
-        weth,
-        payer,
-        COLLATERAL_TOKEN.ownerOf(collateralId),
-        transferAmount
-      );
-    }
   }
 
-  function _handleOutGoingPayment(address to, uint256 amount) internal {
-    TRANSFER_PROXY.tokenTransferFrom(weth, address(msg.sender), to, amount);
+  function _handleOutGoingPayment(
+    address to,
+    uint256 amount,
+    address sender
+  ) internal {
+    TRANSFER_PROXY.tokenTransferFrom(weth, sender, to, amount);
   }
 
   function _cancelAuction(uint256 tokenId) internal {
