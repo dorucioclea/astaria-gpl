@@ -77,12 +77,15 @@ contract AuctionHouse is Auth, IAuctionHouse {
     uint256 initiatorFeeNumerator,
     uint256 initiatorFeeDenominator,
     uint256 reserve,
-    uint256[] calldata stack
+    ILienToken.AuctionStack[] memory stack
   ) external requiresAuth {
     require(!auctionExists(tokenId), "Auction already exists");
     Auction storage newAuction = auctions[tokenId];
     newAuction.duration = duration.safeCastTo40();
-    newAuction.stack = stack;
+    //    newAuction.stack;
+    for (uint i = 0; i < stack.length; i++) {
+      newAuction.stack.push(stack[i]);
+    }
     newAuction.reservePrice = reserve.safeCastTo88();
     newAuction.initiator = initiator;
     newAuction.initiatorFeeNumerator = uint40(initiatorFeeNumerator);
@@ -101,16 +104,14 @@ contract AuctionHouse is Auth, IAuctionHouse {
    * auction currencies in this contract.
    */
   function createBid(uint256 tokenId, uint256 amount) external override {
+    require(auctionExists(tokenId));
     address lastBidder = auctions[tokenId].bidder;
     uint256 currentBid = auctions[tokenId].currentBid;
     uint256 duration = auctions[tokenId].duration;
     uint40 firstBidTime = auctions[tokenId].firstBidTime;
+    require(block.timestamp < firstBidTime + duration, "Auction expired");
     require(
-      firstBidTime == 0 || block.timestamp < firstBidTime + duration,
-      "Auction expired"
-    );
-    require(
-      amount >
+      amount >=
         currentBid +
           ((currentBid * minBidIncrementNumerator) /
             minBidIncrementDenominator),
@@ -164,9 +165,8 @@ contract AuctionHouse is Auth, IAuctionHouse {
       // uint256 timeToAdd = timeBuffer.sub(timeRemaining);
       // uint256 newDuration = auctions[auctionId].duration.add(timeToAdd);
 
-      uint40 newDuration = uint256(
-        duration + (block.timestamp + timeBuffer - firstBidTime)
-      ).safeCastTo40();
+      uint40 newDuration = uint256(block.timestamp + timeBuffer - firstBidTime)
+        .safeCastTo40();
       if (newDuration <= auctions[tokenId].maxDuration) {
         auctions[tokenId].duration = newDuration;
       } else {
@@ -230,8 +230,10 @@ contract AuctionHouse is Auth, IAuctionHouse {
     require(auctionExists(auctionId), "Auction does not exist");
     uint256 transferAmount = auctions[auctionId].reservePrice;
     require(
-      auctions[auctionId].currentBid < auctions[auctionId].reservePrice,
-      "cancelAuction: Auction is at or above reserve"
+      auctions[auctionId].currentBid < auctions[auctionId].reservePrice &&
+        block.timestamp <
+        auctions[auctionId].firstBidTime + auctions[auctionId].duration,
+      "cancelAuction: Auction is at or above reserve or has expired"
     );
     address lastBidder = auctions[auctionId].bidder;
     if (lastBidder != address(0)) {
@@ -291,8 +293,10 @@ contract AuctionHouse is Auth, IAuctionHouse {
     Auction storage auction = auctions[collateralId];
 
     if (auction.stack.length > 0 && transferAmount > 0) {
-      (uint256[] memory newStack, uint256 outcomeSpent) = LIEN_TOKEN
-        .makePaymentAuctionHouse(
+      (
+        ILienToken.AuctionStack[] memory newStack,
+        uint256 outcomeSpent
+      ) = LIEN_TOKEN.makePaymentAuctionHouse(
           auction.stack,
           collateralId,
           transferAmount,
@@ -300,7 +304,10 @@ contract AuctionHouse is Auth, IAuctionHouse {
         );
       unchecked {
         spent = outcomeSpent;
-        auction.stack = newStack;
+        delete auction.stack;
+        for (uint i = 0; i < newStack.length; i++) {
+          auction.stack.push(newStack[i]);
+        }
       }
     }
   }

@@ -3,13 +3,14 @@ pragma solidity >=0.8.16;
 
 import {ITokenBase} from "core/interfaces/ITokenBase.sol";
 import {IERC20} from "core/interfaces/IERC20.sol";
+import {IERC20Metadata} from "core/interfaces/IERC20Metadata.sol";
 
 /// @notice Modern and gas efficient ERC20 + EIP-2612 implementation.
 /// @author Solmate (https://github.com/Rari-Capital/solmate/blob/main/src/tokens/ERC20.sol)
 /// @author Modified from Uniswap (https://github.com/Uniswap/uniswap-v2-core/blob/master/contracts/UniswapV2ERC20.sol)
 /// @dev Do not manually set balances without updating totalSupply, as the sum of all user balances must not exceed it.
 
-abstract contract ERC20Cloned is ITokenBase, IERC20 {
+abstract contract ERC20Cloned is IERC20Metadata {
   bytes32 constant ERC20_SLOT = keccak256("xyz.astaria.ERC20.storage.location");
 
   struct ERC20Data {
@@ -30,11 +31,10 @@ abstract contract ERC20Cloned is ITokenBase, IERC20 {
     return _loadERC20Slot().balanceOf[account];
   }
 
-  function approve(address spender, uint256 amount)
-    public
-    virtual
-    returns (bool)
-  {
+  function approve(
+    address spender,
+    uint256 amount
+  ) public virtual returns (bool) {
     ERC20Data storage s = _loadERC20Slot();
     s.allowance[msg.sender][spender] = amount;
 
@@ -58,11 +58,10 @@ abstract contract ERC20Cloned is ITokenBase, IERC20 {
     return true;
   }
 
-  function allowance(address owner, address spender)
-    external
-    view
-    returns (uint256)
-  {
+  function allowance(
+    address owner,
+    address spender
+  ) external view returns (uint256) {
     ERC20Data storage s = _loadERC20Slot();
     return s.allowance[owner][spender];
   }

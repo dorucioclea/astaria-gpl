@@ -1,5 +1,7 @@
 pragma solidity ^0.8.13;
 
+import {ILienToken} from "core/interfaces/ILienToken.sol";
+
 pragma experimental ABIEncoderV2;
 
 interface IAuctionHouse {
@@ -16,7 +18,7 @@ interface IAuctionHouse {
     uint40 firstBidTime; //5
     uint88 reservePrice; //11
     // The length of time to run the auction for, after the first bid was made
-    uint256[] stack;
+    ILienToken.AuctionStack[] stack;
     // The time of the first bid
   }
 
@@ -51,7 +53,7 @@ interface IAuctionHouse {
     uint256 initiatorFeeNumerator,
     uint256 initiatorFeeDenominator,
     uint256 reserve,
-    uint256[] calldata stack
+    ILienToken.AuctionStack[] memory stack
   ) external;
 
   function createBid(uint256 tokenId, uint256 amount) external;
