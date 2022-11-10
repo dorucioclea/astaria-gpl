@@ -79,10 +79,11 @@ contract AuctionHouse is Auth, IAuctionHouse {
     uint256 reserve,
     ILienToken.AuctionStack[] memory stack
   ) external requiresAuth {
+    require(initiator != address(0));
     require(!auctionExists(tokenId), "Auction already exists");
     Auction storage newAuction = auctions[tokenId];
     newAuction.duration = duration.safeCastTo40();
-    //    newAuction.stack;
+
     for (uint i = 0; i < stack.length; i++) {
       newAuction.stack.push(stack[i]);
     }
@@ -326,6 +327,6 @@ contract AuctionHouse is Auth, IAuctionHouse {
   }
 
   function auctionExists(uint256 tokenId) public view returns (bool) {
-    return auctions[tokenId].initiator != address(0);
+    return auctions[tokenId].firstBidTime != uint(0);
   }
 }

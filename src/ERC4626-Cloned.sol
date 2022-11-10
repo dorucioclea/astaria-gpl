@@ -135,7 +135,7 @@ abstract contract ERC4626Cloned is IERC4626, ERC20Cloned {
   ) public view virtual returns (uint256) {
     uint256 supply = totalSupply(); // Saves an extra SLOAD if totalSupply is non-zero.
 
-    return supply == 0 ? assets : assets.mulDivUp(supply, totalAssets());
+    return supply == 0 ? 10e18 : assets.mulDivUp(supply, totalAssets());
   }
 
   function previewRedeem(uint256 shares) public view virtual returns (uint256) {
