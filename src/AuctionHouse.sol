@@ -84,7 +84,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
     Auction storage newAuction = auctions[tokenId];
     newAuction.duration = duration.safeCastTo40();
 
-    for (uint i = 0; i < stack.length; i++) {
+    for (uint256 i = 0; i < stack.length; i++) {
       newAuction.stack.push(stack[i]);
     }
     newAuction.reservePrice = reserve.safeCastTo88();
@@ -171,9 +171,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
       if (newDuration <= auctions[tokenId].maxDuration) {
         auctions[tokenId].duration = newDuration;
       } else {
-        auctions[tokenId].duration =
-          auctions[tokenId].maxDuration -
-          firstBidTime;
+        auctions[tokenId].duration = auctions[tokenId].maxDuration;
       }
       extended = true;
     }
@@ -196,9 +194,12 @@ contract AuctionHouse is Auth, IAuctionHouse {
    * @dev If for some reason the auction cannot be finalized (invalid token recipient, for example),
    * The auction is reset and the NFT is transferred back to the auction creator.
    */
-  function endAuction(
-    uint256 auctionId
-  ) external override requiresAuth returns (address winner) {
+  function endAuction(uint256 auctionId)
+    external
+    override
+    requiresAuth
+    returns (address winner)
+  {
     require(
       block.timestamp >=
         auctions[auctionId].firstBidTime + auctions[auctionId].duration,
@@ -224,10 +225,10 @@ contract AuctionHouse is Auth, IAuctionHouse {
    * @notice Cancel an auction.
    * @dev Transfers the NFT back to the auction creator and emits an AuctionCanceled event
    */
-  function cancelAuction(
-    uint256 auctionId,
-    address canceledBy
-  ) external requiresAuth {
+  function cancelAuction(uint256 auctionId, address canceledBy)
+    external
+    requiresAuth
+  {
     require(auctionExists(auctionId), "Auction does not exist");
     uint256 transferAmount = auctions[auctionId].reservePrice;
     require(
@@ -259,9 +260,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
     _cancelAuction(auctionId);
   }
 
-  function getAuctionData(
-    uint256 _auctionId
-  )
+  function getAuctionData(uint256 _auctionId)
     public
     view
     returns (
@@ -306,7 +305,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
       unchecked {
         spent = outcomeSpent;
         delete auction.stack;
-        for (uint i = 0; i < newStack.length; i++) {
+        for (uint256 i = 0; i < newStack.length; i++) {
           auction.stack.push(newStack[i]);
         }
       }
@@ -327,6 +326,6 @@ contract AuctionHouse is Auth, IAuctionHouse {
   }
 
   function auctionExists(uint256 tokenId) public view returns (bool) {
-    return auctions[tokenId].firstBidTime != uint(0);
+    return auctions[tokenId].firstBidTime != uint256(0);
   }
 }
