@@ -2,10 +2,10 @@
 pragma solidity ^0.8.17;
 
 import {IERC4626} from "core/interfaces/IERC4626.sol";
+import {IERC4626RouterBase} from "gpl/interfaces/IERC4626RouterBase.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
-import {IERC4626RouterBase} from "./interfaces/IERC4626RouterBase.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
-import {Multicall} from "./Multicall.sol";
+import {Multicall} from "gpl/Multicall.sol";
 
 /// @title ERC4626 Router Base Contract
 abstract contract ERC4626RouterBase is IERC4626RouterBase, Multicall {

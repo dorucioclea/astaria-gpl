@@ -7,14 +7,14 @@ pragma experimental ABIEncoderV2;
 import {Auth, Authority} from "solmate/auth/Auth.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
-import {IAuctionHouse} from "./interfaces/IAuctionHouse.sol";
+import {IAuctionHouse} from "gpl/interfaces/IAuctionHouse.sol";
 import {ITransferProxy} from "core/interfaces/ITransferProxy.sol";
 
 import {ILienToken} from "core/interfaces/ILienToken.sol";
 import {ICollateralToken} from "core/interfaces/ICollateralToken.sol";
 import {IAstariaRouter} from "core/interfaces/IAstariaRouter.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
-import {SafeCastLib} from "./utils/SafeCastLib.sol";
+import {SafeCastLib} from "gpl/utils/SafeCastLib.sol";
 import {PublicVault, IPublicVault} from "core/PublicVault.sol";
 
 contract AuctionHouse is Auth, IAuctionHouse {
