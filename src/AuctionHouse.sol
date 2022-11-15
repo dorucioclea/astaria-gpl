@@ -73,6 +73,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
   function createAuction(
     uint256 tokenId,
     uint256 duration,
+    uint256 maxDuration,
     address initiator,
     uint256 initiatorFeeNumerator,
     uint256 initiatorFeeDenominator,
@@ -92,7 +93,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
     newAuction.initiatorFeeNumerator = uint40(initiatorFeeNumerator);
     newAuction.initiatorFeeDenominator = uint40(initiatorFeeDenominator);
     newAuction.firstBidTime = block.timestamp.safeCastTo40();
-    newAuction.maxDuration = (duration + 1 days).safeCastTo40();
+    newAuction.maxDuration = (maxDuration).safeCastTo40();
     newAuction.currentBid = 0;
 
     emit AuctionCreated(tokenId, duration, reserve);
@@ -215,7 +216,6 @@ contract AuctionHouse is Auth, IAuctionHouse {
 
     emit AuctionEnded(auctionId, winner, auction.currentBid);
     if (auction.stack.length > 0) {
-      //TODO: make sure this check doesn't break something
       LIEN_TOKEN.removeLiens(auctionId, auction.stack);
     }
     delete auctions[auctionId];

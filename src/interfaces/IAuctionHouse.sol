@@ -49,6 +49,7 @@ interface IAuctionHouse {
   function createAuction(
     uint256 tokenId,
     uint256 duration,
+    uint256 maxDuration,
     address initiator,
     uint256 initiatorFeeNumerator,
     uint256 initiatorFeeDenominator,
@@ -64,9 +65,7 @@ interface IAuctionHouse {
 
   function auctionExists(uint256 tokenId) external returns (bool);
 
-  function getAuctionData(
-    uint256 tokenId
-  )
+  function getAuctionData(uint256 tokenId)
     external
     view
     returns (

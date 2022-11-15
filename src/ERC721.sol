@@ -96,7 +96,7 @@ abstract contract ERC721 is IERC721 {
     address from,
     address to,
     uint256 id
-  ) public override(IERC721) {
+  ) public virtual override(IERC721) {
     ERC721Storage storage s = _loadERC721Slot();
 
     require(from == s._ownerOf[id], "WRONG_FROM");
