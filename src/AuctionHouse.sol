@@ -7,14 +7,14 @@ pragma experimental ABIEncoderV2;
 import {Auth, Authority} from "solmate/auth/Auth.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
-import {IAuctionHouse} from "./interfaces/IAuctionHouse.sol";
+import {IAuctionHouse} from "gpl/interfaces/IAuctionHouse.sol";
 import {ITransferProxy} from "core/interfaces/ITransferProxy.sol";
 
 import {ILienToken} from "core/interfaces/ILienToken.sol";
 import {ICollateralToken} from "core/interfaces/ICollateralToken.sol";
 import {IAstariaRouter} from "core/interfaces/IAstariaRouter.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
-import {SafeCastLib} from "./utils/SafeCastLib.sol";
+import {SafeCastLib} from "gpl/utils/SafeCastLib.sol";
 import {PublicVault, IPublicVault} from "core/PublicVault.sol";
 
 contract AuctionHouse is Auth, IAuctionHouse {
@@ -73,22 +73,27 @@ contract AuctionHouse is Auth, IAuctionHouse {
   function createAuction(
     uint256 tokenId,
     uint256 duration,
+    uint256 maxDuration,
     address initiator,
     uint256 initiatorFeeNumerator,
     uint256 initiatorFeeDenominator,
     uint256 reserve,
-    uint256[] calldata stack
+    ILienToken.AuctionStack[] memory stack
   ) external requiresAuth {
+    require(initiator != address(0));
     require(!auctionExists(tokenId), "Auction already exists");
     Auction storage newAuction = auctions[tokenId];
     newAuction.duration = duration.safeCastTo40();
-    newAuction.stack = stack;
+
+    for (uint256 i = 0; i < stack.length; i++) {
+      newAuction.stack.push(stack[i]);
+    }
     newAuction.reservePrice = reserve.safeCastTo88();
     newAuction.initiator = initiator;
     newAuction.initiatorFeeNumerator = uint40(initiatorFeeNumerator);
     newAuction.initiatorFeeDenominator = uint40(initiatorFeeDenominator);
     newAuction.firstBidTime = block.timestamp.safeCastTo40();
-    newAuction.maxDuration = (duration + 1 days).safeCastTo40();
+    newAuction.maxDuration = (maxDuration).safeCastTo40();
     newAuction.currentBid = 0;
 
     emit AuctionCreated(tokenId, duration, reserve);
@@ -101,16 +106,14 @@ contract AuctionHouse is Auth, IAuctionHouse {
    * auction currencies in this contract.
    */
   function createBid(uint256 tokenId, uint256 amount) external override {
+    require(auctionExists(tokenId));
     address lastBidder = auctions[tokenId].bidder;
     uint256 currentBid = auctions[tokenId].currentBid;
     uint256 duration = auctions[tokenId].duration;
     uint40 firstBidTime = auctions[tokenId].firstBidTime;
+    require(block.timestamp < firstBidTime + duration, "Auction expired");
     require(
-      firstBidTime == 0 || block.timestamp < firstBidTime + duration,
-      "Auction expired"
-    );
-    require(
-      amount >
+      amount >=
         currentBid +
           ((currentBid * minBidIncrementNumerator) /
             minBidIncrementDenominator),
@@ -164,15 +167,12 @@ contract AuctionHouse is Auth, IAuctionHouse {
       // uint256 timeToAdd = timeBuffer.sub(timeRemaining);
       // uint256 newDuration = auctions[auctionId].duration.add(timeToAdd);
 
-      uint40 newDuration = uint256(
-        duration + (block.timestamp + timeBuffer - firstBidTime)
-      ).safeCastTo40();
+      uint40 newDuration = uint256(block.timestamp + timeBuffer - firstBidTime)
+        .safeCastTo40();
       if (newDuration <= auctions[tokenId].maxDuration) {
         auctions[tokenId].duration = newDuration;
       } else {
-        auctions[tokenId].duration =
-          auctions[tokenId].maxDuration -
-          firstBidTime;
+        auctions[tokenId].duration = auctions[tokenId].maxDuration;
       }
       extended = true;
     }
@@ -195,9 +195,12 @@ contract AuctionHouse is Auth, IAuctionHouse {
    * @dev If for some reason the auction cannot be finalized (invalid token recipient, for example),
    * The auction is reset and the NFT is transferred back to the auction creator.
    */
-  function endAuction(
-    uint256 auctionId
-  ) external override requiresAuth returns (address winner) {
+  function endAuction(uint256 auctionId)
+    external
+    override
+    requiresAuth
+    returns (address winner)
+  {
     require(
       block.timestamp >=
         auctions[auctionId].firstBidTime + auctions[auctionId].duration,
@@ -213,7 +216,6 @@ contract AuctionHouse is Auth, IAuctionHouse {
 
     emit AuctionEnded(auctionId, winner, auction.currentBid);
     if (auction.stack.length > 0) {
-      //TODO: make sure this check doesn't break something
       LIEN_TOKEN.removeLiens(auctionId, auction.stack);
     }
     delete auctions[auctionId];
@@ -223,15 +225,17 @@ contract AuctionHouse is Auth, IAuctionHouse {
    * @notice Cancel an auction.
    * @dev Transfers the NFT back to the auction creator and emits an AuctionCanceled event
    */
-  function cancelAuction(
-    uint256 auctionId,
-    address canceledBy
-  ) external requiresAuth {
+  function cancelAuction(uint256 auctionId, address canceledBy)
+    external
+    requiresAuth
+  {
     require(auctionExists(auctionId), "Auction does not exist");
     uint256 transferAmount = auctions[auctionId].reservePrice;
     require(
-      auctions[auctionId].currentBid < auctions[auctionId].reservePrice,
-      "cancelAuction: Auction is at or above reserve"
+      auctions[auctionId].currentBid < auctions[auctionId].reservePrice &&
+        block.timestamp <
+        auctions[auctionId].firstBidTime + auctions[auctionId].duration,
+      "cancelAuction: Auction is at or above reserve or has expired"
     );
     address lastBidder = auctions[auctionId].bidder;
     if (lastBidder != address(0)) {
@@ -256,9 +260,7 @@ contract AuctionHouse is Auth, IAuctionHouse {
     _cancelAuction(auctionId);
   }
 
-  function getAuctionData(
-    uint256 _auctionId
-  )
+  function getAuctionData(uint256 _auctionId)
     public
     view
     returns (
@@ -291,8 +293,10 @@ contract AuctionHouse is Auth, IAuctionHouse {
     Auction storage auction = auctions[collateralId];
 
     if (auction.stack.length > 0 && transferAmount > 0) {
-      (uint256[] memory newStack, uint256 outcomeSpent) = LIEN_TOKEN
-        .makePaymentAuctionHouse(
+      (
+        ILienToken.AuctionStack[] memory newStack,
+        uint256 outcomeSpent
+      ) = LIEN_TOKEN.makePaymentAuctionHouse(
           auction.stack,
           collateralId,
           transferAmount,
@@ -300,7 +304,10 @@ contract AuctionHouse is Auth, IAuctionHouse {
         );
       unchecked {
         spent = outcomeSpent;
-        auction.stack = newStack;
+        delete auction.stack;
+        for (uint256 i = 0; i < newStack.length; i++) {
+          auction.stack.push(newStack[i]);
+        }
       }
     }
   }
@@ -319,6 +326,6 @@ contract AuctionHouse is Auth, IAuctionHouse {
   }
 
   function auctionExists(uint256 tokenId) public view returns (bool) {
-    return auctions[tokenId].initiator != address(0);
+    return auctions[tokenId].firstBidTime != uint256(0);
   }
 }

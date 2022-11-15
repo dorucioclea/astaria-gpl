@@ -8,39 +8,23 @@ import {ERC20} from "solmate/tokens/ERC20.sol";
 import {IAstariaVaultBase} from "core/interfaces/IAstariaVaultBase.sol";
 import {ITokenBase} from "core/interfaces/ITokenBase.sol";
 import {ERC20Cloned} from "gpl/ERC20-Cloned.sol";
-import {IVault} from "core/interfaces/IVault.sol";
-import {ERC4626Base} from "core/ERC4626Base.sol";
+import {IERC4626} from "core/interfaces/IERC4626.sol";
 
-abstract contract ERC4626Cloned is ERC20Cloned, ERC4626Base, IVault {
+abstract contract ERC4626Cloned is IERC4626, ERC20Cloned {
   using SafeTransferLib for ERC20;
   using FixedPointMathLib for uint256;
 
-  event Deposit(
-    address indexed caller,
-    address indexed owner,
-    uint256 assets,
-    uint256 shares
-  );
+  function asset() public view virtual returns (address);
 
-  event Withdraw(
-    address indexed caller,
-    address indexed receiver,
-    address indexed owner,
+  function deposit(
     uint256 assets,
-    uint256 shares
-  );
-
-  function deposit(uint256 assets, address receiver)
-    public
-    virtual
-    override(IVault)
-    returns (uint256 shares)
-  {
+    address receiver
+  ) public virtual returns (uint256 shares) {
     // Check for rounding error since we round down in previewDeposit.
     require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
 
     // Need to transfer before minting or ERC777s could reenter.
-    ERC20(underlying()).safeTransferFrom(msg.sender, address(this), assets);
+    ERC20(asset()).safeTransferFrom(msg.sender, address(this), assets);
 
     _mint(receiver, shares);
 
@@ -49,15 +33,14 @@ abstract contract ERC4626Cloned is ERC20Cloned, ERC4626Base, IVault {
     afterDeposit(assets, shares);
   }
 
-  function mint(uint256 shares, address receiver)
-    public
-    virtual
-    returns (uint256 assets)
-  {
+  function mint(
+    uint256 shares,
+    address receiver
+  ) public virtual returns (uint256 assets) {
     assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
 
     // Need to transfer before minting or ERC777s could reenter.
-    ERC20(underlying()).safeTransferFrom(msg.sender, address(this), assets);
+    ERC20(asset()).safeTransferFrom(msg.sender, address(this), assets);
 
     _mint(receiver, shares);
 
@@ -88,7 +71,7 @@ abstract contract ERC4626Cloned is ERC20Cloned, ERC4626Base, IVault {
 
     emit Withdraw(msg.sender, receiver, owner, assets, shares);
 
-    ERC20(underlying()).safeTransfer(receiver, assets);
+    ERC20(asset()).safeTransfer(receiver, assets);
   }
 
   function redeem(
@@ -114,57 +97,45 @@ abstract contract ERC4626Cloned is ERC20Cloned, ERC4626Base, IVault {
 
     emit Withdraw(msg.sender, receiver, owner, assets, shares);
 
-    ERC20(underlying()).safeTransfer(receiver, assets);
+    ERC20(asset()).safeTransfer(receiver, assets);
   }
 
   function totalAssets() public view virtual returns (uint256);
 
-  function convertToShares(uint256 assets)
-    public
-    view
-    virtual
-    returns (uint256)
-  {
+  function convertToShares(
+    uint256 assets
+  ) public view virtual returns (uint256) {
     uint256 supply = totalSupply(); // Saves an extra SLOAD if totalSupply is non-zero.
 
     return supply == 0 ? assets : assets.mulDivDown(supply, totalAssets());
   }
 
-  function convertToAssets(uint256 shares)
-    public
-    view
-    virtual
-    returns (uint256)
-  {
+  function convertToAssets(
+    uint256 shares
+  ) public view virtual returns (uint256) {
     uint256 supply = totalSupply(); // Saves an extra SLOAD if totalSupply is non-zero.
 
     return supply == 0 ? shares : shares.mulDivDown(totalAssets(), supply);
   }
 
-  function previewDeposit(uint256 assets)
-    public
-    view
-    virtual
-    returns (uint256)
-  {
+  function previewDeposit(
+    uint256 assets
+  ) public view virtual returns (uint256) {
     return convertToShares(assets);
   }
 
   function previewMint(uint256 shares) public view virtual returns (uint256) {
     uint256 supply = totalSupply(); // Saves an extra SLOAD if totalSupply is non-zero.
 
-    return supply == 0 ? shares : shares.mulDivUp(totalAssets(), supply);
+    return supply == 0 ? 10e18 : shares.mulDivUp(totalAssets(), supply);
   }
 
-  function previewWithdraw(uint256 assets)
-    public
-    view
-    virtual
-    returns (uint256)
-  {
+  function previewWithdraw(
+    uint256 assets
+  ) public view virtual returns (uint256) {
     uint256 supply = totalSupply(); // Saves an extra SLOAD if totalSupply is non-zero.
 
-    return supply == 0 ? assets : assets.mulDivUp(supply, totalAssets());
+    return supply == 0 ? 10e18 : assets.mulDivUp(supply, totalAssets());
   }
 
   function previewRedeem(uint256 shares) public view virtual returns (uint256) {
