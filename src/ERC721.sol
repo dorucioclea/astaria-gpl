@@ -3,11 +3,11 @@ pragma solidity ^0.8.16;
 
 import {IERC721} from "core/interfaces/IERC721.sol";
 
-//import {Initializable} from "core/utils/Initializable.sol";
+import {Initializable} from "core/utils/Initializable.sol";
 
 /// @notice Modern, minimalist, and gas efficient ERC-721 implementation.
 /// @author Solmate (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC721.sol)
-abstract contract ERC721 is IERC721 {
+abstract contract ERC721 is Initializable, IERC721 {
   /* //////////////////////////////////////////////////////////////
     METADATA STORAGE/LOGIC
   ////////////////////////////////////////////////////////////// */
@@ -62,16 +62,13 @@ abstract contract ERC721 is IERC721 {
   }
 
   /* //////////////////////////////////////////////////////////////
-  CONSTRUCTOR
+  INITIALIZATION LOGIC
   ////////////////////////////////////////////////////////////// */
 
-  //  constructor(string memory _name, string memory _symbol) {
-  //    ERC721Storage storage s = _loadERC721Slot();
-  //    s.name = _name;
-  //    s.symbol = _symbol;
-  //  }
-
-  function __initERC721(string memory _name, string memory _symbol) public {
+  function __initERC721(string memory _name, string memory _symbol)
+    public
+    initializer
+  {
     ERC721Storage storage s = _loadERC721Slot();
     s.name = _name;
     s.symbol = _symbol;
@@ -80,6 +77,14 @@ abstract contract ERC721 is IERC721 {
   /* //////////////////////////////////////////////////////////////
   ERC721 LOGIC
   ////////////////////////////////////////////////////////////// */
+
+  function name() public view returns (string memory) {
+    return _loadERC721Slot().name;
+  }
+
+  function symbol() public view returns (string memory) {
+    return _loadERC721Slot().symbol;
+  }
 
   function approve(address spender, uint256 id) external virtual {
     ERC721Storage storage s = _loadERC721Slot();

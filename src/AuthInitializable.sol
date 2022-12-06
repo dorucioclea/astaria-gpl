@@ -18,14 +18,6 @@ abstract contract AuthInitializable {
     Authority authority;
   }
 
-  //  constructor(address _owner, Authority _authority) {
-  //    owner = _owner;
-  //    authority = _authority;
-  //
-  //    emit OwnershipTransferred(msg.sender, _owner);
-  //    emit AuthorityUpdated(msg.sender, _authority);
-  //  }
-
   function _getAuthSlot() internal view returns (AuthStorage storage s) {
     bytes32 slot = authSlot;
     assembly {
