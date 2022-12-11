@@ -14,9 +14,7 @@ abstract contract ERC4626Cloned is IERC4626, ERC20Cloned {
   using SafeTransferLib for ERC20;
   using FixedPointMathLib for uint256;
 
-  function minDepositAmount() public view virtual returns (uint256) {
-    return 10**ERC20(asset()).decimals() / 100;
-  }
+  function minDepositAmount() public view virtual returns (uint256);
 
   function asset() public view virtual returns (address);
 
