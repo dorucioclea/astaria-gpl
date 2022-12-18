@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity >=0.8.16;
 
+<<<<<<< Updated upstream
 import {ITokenBase} from "core/interfaces/ITokenBase.sol";
 import {IERC20} from "core/interfaces/IERC20.sol";
+=======
+>>>>>>> Stashed changes
 import {IERC20Metadata} from "core/interfaces/IERC20Metadata.sol";
 
 /// @notice Modern and gas efficient ERC20 + EIP-2612 implementation.
