@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-pragma solidity ^0.8.4;
+
+pragma solidity =0.8.17;
 
 import "./FullMathUniswap.sol";
 
@@ -32,6 +33,10 @@ library LiquidityAmounts {
     uint160 sqrtRatioBX96,
     uint256 amount0
   ) internal pure returns (uint128 liquidity) {
+<<<<<<< HEAD
+=======
+
+>>>>>>> f1d9dde (Merge branch 'main' into spearbit/gplinformationals)
     unchecked {
       if (sqrtRatioAX96 > sqrtRatioBX96)
         (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
@@ -62,6 +67,10 @@ library LiquidityAmounts {
     uint160 sqrtRatioBX96,
     uint256 amount1
   ) internal pure returns (uint128 liquidity) {
+<<<<<<< HEAD
+=======
+
+>>>>>>> f1d9dde (Merge branch 'main' into spearbit/gplinformationals)
     unchecked {
       if (sqrtRatioAX96 > sqrtRatioBX96)
         (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
@@ -134,10 +143,18 @@ library LiquidityAmounts {
     uint160 sqrtRatioBX96,
     uint128 liquidity
   ) internal pure returns (uint256 amount0) {
+<<<<<<< HEAD
     unchecked {
       if (sqrtRatioAX96 > sqrtRatioBX96)
         (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
 
+=======
+
+    unchecked {
+      if (sqrtRatioAX96 > sqrtRatioBX96)
+        (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
+
+>>>>>>> f1d9dde (Merge branch 'main' into spearbit/gplinformationals)
       return
         FullMathUniswap.mulDiv(
           uint256(liquidity) << FixedPoint96.RESOLUTION,

@@ -13,6 +13,7 @@ abstract contract ERC20Cloned is IERC20Metadata {
   uint256 private constant ERC20_SLOT =
     uint256(keccak256("xyz.astaria.ERC20.storage.location")) - 1;
 
+
   struct ERC20Data {
     uint256 _totalSupply;
     mapping(address => uint256) balanceOf;
