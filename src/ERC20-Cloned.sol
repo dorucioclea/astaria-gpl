@@ -1,7 +1,6 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: MIT
 pragma solidity >=0.8.16;
 
-import {ITokenBase} from "core/interfaces/ITokenBase.sol";
 import {IERC20} from "core/interfaces/IERC20.sol";
 import {IERC20Metadata} from "core/interfaces/IERC20Metadata.sol";
 
@@ -16,6 +15,7 @@ abstract contract ERC20Cloned is IERC20Metadata {
     "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
   );
 
+
   struct ERC20Data {
     uint256 _totalSupply;
     mapping(address => uint256) balanceOf;
@@ -24,7 +24,8 @@ abstract contract ERC20Cloned is IERC20Metadata {
   }
 
   function _loadERC20Slot() internal pure returns (ERC20Data storage s) {
-    bytes32 slot = ERC20_SLOT;
+    uint256 slot = ERC20_SLOT;
+
     assembly {
       s.slot := slot
     }

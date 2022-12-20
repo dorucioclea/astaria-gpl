@@ -1,12 +1,10 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: MIT
 pragma solidity >=0.8.16;
 
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {Clone} from "clones-with-immutable-args/Clone.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
-import {IAstariaVaultBase} from "core/interfaces/IAstariaVaultBase.sol";
-import {ITokenBase} from "core/interfaces/ITokenBase.sol";
 import {ERC20Cloned} from "gpl/ERC20-Cloned.sol";
 import {IERC4626} from "core/interfaces/IERC4626.sol";
 
@@ -14,15 +12,19 @@ abstract contract ERC4626Cloned is IERC4626, ERC20Cloned {
   using SafeTransferLib for ERC20;
   using FixedPointMathLib for uint256;
 
+  function minDepositAmount() public view virtual returns (uint256);
+
   function asset() public view virtual returns (address);
 
-  function deposit(
-    uint256 assets,
-    address receiver
-  ) public virtual returns (uint256 shares) {
+  function deposit(uint256 assets, address receiver)
+    public
+    virtual
+    returns (uint256 shares)
+  {
     // Check for rounding error since we round down in previewDeposit.
     require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
 
+    require(shares > minDepositAmount(), "VALUE_TOO_SMALL");
     // Need to transfer before minting or ERC777s could reenter.
     ERC20(asset()).safeTransferFrom(msg.sender, address(this), assets);
 
@@ -38,7 +40,7 @@ abstract contract ERC4626Cloned is IERC4626, ERC20Cloned {
     address receiver
   ) public virtual returns (uint256 assets) {
     assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
-
+    require(assets > minDepositAmount(), "VALUE_TOO_SMALL");
     // Need to transfer before minting or ERC777s could reenter.
     ERC20(asset()).safeTransferFrom(msg.sender, address(this), assets);
 

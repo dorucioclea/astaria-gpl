@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.16;
 
 import {IERC721} from "core/interfaces/IERC721.sol";
@@ -10,8 +10,8 @@ abstract contract ERC721 is IERC721 {
     METADATA STORAGE/LOGIC
   ////////////////////////////////////////////////////////////// */
 
-  bytes32 constant ERC721_SLOT =
-    keccak256("xyz.astaria.ERC721.storage.location");
+  uint256 private constant ERC721_SLOT =
+    uint256(keccak256("xyz.astaria.ERC721.storage.location")) - 1;
   struct ERC721Storage {
     string name;
     string symbol;
@@ -40,7 +40,8 @@ abstract contract ERC721 is IERC721 {
   ////////////////////////////////////////////////////////////// */
 
   function _loadERC721Slot() internal pure returns (ERC721Storage storage s) {
-    bytes32 slot = ERC721_SLOT;
+    uint256 slot = ERC721_SLOT;
+
     assembly {
       s.slot := slot
     }
