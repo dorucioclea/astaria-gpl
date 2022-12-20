@@ -1,12 +1,10 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: MIT
 pragma solidity >=0.8.16;
 
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {Clone} from "clones-with-immutable-args/Clone.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
-import {IAstariaVaultBase} from "core/interfaces/IAstariaVaultBase.sol";
-import {ITokenBase} from "core/interfaces/ITokenBase.sol";
 import {ERC20Cloned} from "gpl/ERC20-Cloned.sol";
 import {IERC4626} from "core/interfaces/IERC4626.sol";
 
@@ -16,10 +14,11 @@ abstract contract ERC4626Cloned is IERC4626, ERC20Cloned {
 
   function asset() public view virtual returns (address);
 
-  function deposit(
-    uint256 assets,
-    address receiver
-  ) public virtual returns (uint256 shares) {
+  function deposit(uint256 assets, address receiver)
+    public
+    virtual
+    returns (uint256 shares)
+  {
     // Check for rounding error since we round down in previewDeposit.
     require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
 
@@ -33,10 +32,11 @@ abstract contract ERC4626Cloned is IERC4626, ERC20Cloned {
     afterDeposit(assets, shares);
   }
 
-  function mint(
-    uint256 shares,
-    address receiver
-  ) public virtual returns (uint256 assets) {
+  function mint(uint256 shares, address receiver)
+    public
+    virtual
+    returns (uint256 assets)
+  {
     assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
 
     // Need to transfer before minting or ERC777s could reenter.
@@ -102,25 +102,34 @@ abstract contract ERC4626Cloned is IERC4626, ERC20Cloned {
 
   function totalAssets() public view virtual returns (uint256);
 
-  function convertToShares(
-    uint256 assets
-  ) public view virtual returns (uint256) {
+  function convertToShares(uint256 assets)
+    public
+    view
+    virtual
+    returns (uint256)
+  {
     uint256 supply = totalSupply(); // Saves an extra SLOAD if totalSupply is non-zero.
 
     return supply == 0 ? assets : assets.mulDivDown(supply, totalAssets());
   }
 
-  function convertToAssets(
-    uint256 shares
-  ) public view virtual returns (uint256) {
+  function convertToAssets(uint256 shares)
+    public
+    view
+    virtual
+    returns (uint256)
+  {
     uint256 supply = totalSupply(); // Saves an extra SLOAD if totalSupply is non-zero.
 
     return supply == 0 ? shares : shares.mulDivDown(totalAssets(), supply);
   }
 
-  function previewDeposit(
-    uint256 assets
-  ) public view virtual returns (uint256) {
+  function previewDeposit(uint256 assets)
+    public
+    view
+    virtual
+    returns (uint256)
+  {
     return convertToShares(assets);
   }
 
@@ -130,9 +139,12 @@ abstract contract ERC4626Cloned is IERC4626, ERC20Cloned {
     return supply == 0 ? 10e18 : shares.mulDivUp(totalAssets(), supply);
   }
 
-  function previewWithdraw(
-    uint256 assets
-  ) public view virtual returns (uint256) {
+  function previewWithdraw(uint256 assets)
+    public
+    view
+    virtual
+    returns (uint256)
+  {
     uint256 supply = totalSupply(); // Saves an extra SLOAD if totalSupply is non-zero.
 
     return supply == 0 ? 10e18 : assets.mulDivUp(supply, totalAssets());
