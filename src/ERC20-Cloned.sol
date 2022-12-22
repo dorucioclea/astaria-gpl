@@ -10,8 +10,11 @@ import {IERC20Metadata} from "core/interfaces/IERC20Metadata.sol";
 /// @dev Do not manually set balances without updating totalSupply, as the sum of all user balances must not exceed it.
 
 abstract contract ERC20Cloned is IERC20Metadata {
-  uint256 private constant ERC20_SLOT =
-    uint256(keccak256("xyz.astaria.ERC20.storage.location")) - 1;
+  bytes32 constant ERC20_SLOT = keccak256("xyz.astaria.ERC20.storage.location");
+  bytes32 private constant PERMIT_TYPEHASH = keccak256(
+    "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+  );
+
 
 
   struct ERC20Data {
@@ -33,11 +36,10 @@ abstract contract ERC20Cloned is IERC20Metadata {
     return _loadERC20Slot().balanceOf[account];
   }
 
-  function approve(address spender, uint256 amount)
-    public
-    virtual
-    returns (bool)
-  {
+  function approve(
+    address spender,
+    uint256 amount
+  ) public virtual returns (bool) {
     ERC20Data storage s = _loadERC20Slot();
     s.allowance[msg.sender][spender] = amount;
 
@@ -61,11 +63,10 @@ abstract contract ERC20Cloned is IERC20Metadata {
     return true;
   }
 
-  function allowance(address owner, address spender)
-    external
-    view
-    returns (uint256)
-  {
+  function allowance(
+    address owner,
+    address spender
+  ) external view returns (uint256) {
     ERC20Data storage s = _loadERC20Slot();
     return s.allowance[owner][spender];
   }

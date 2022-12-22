@@ -33,10 +33,7 @@ library LiquidityAmounts {
     uint160 sqrtRatioBX96,
     uint256 amount0
   ) internal pure returns (uint128 liquidity) {
-<<<<<<< HEAD
-=======
 
->>>>>>> f1d9dde (Merge branch 'main' into spearbit/gplinformationals)
     unchecked {
       if (sqrtRatioAX96 > sqrtRatioBX96)
         (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
@@ -68,9 +65,13 @@ library LiquidityAmounts {
     uint256 amount1
   ) internal pure returns (uint128 liquidity) {
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 
 >>>>>>> f1d9dde (Merge branch 'main' into spearbit/gplinformationals)
+=======
+
+>>>>>>> 7062e16 (Merge pull request #12 from AstariaXYZ/spearbit/gplinformationals)
     unchecked {
       if (sqrtRatioAX96 > sqrtRatioBX96)
         (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
@@ -144,6 +145,10 @@ library LiquidityAmounts {
     uint128 liquidity
   ) internal pure returns (uint256 amount0) {
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+
+>>>>>>> 7062e16 (Merge pull request #12 from AstariaXYZ/spearbit/gplinformationals)
     unchecked {
       if (sqrtRatioAX96 > sqrtRatioBX96)
         (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
