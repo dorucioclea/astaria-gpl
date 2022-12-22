@@ -17,7 +17,6 @@ abstract contract ERC20Cloned is IERC20Metadata {
       "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
     );
 
-
   struct ERC20Data {
     uint256 _totalSupply;
     mapping(address => uint256) balanceOf;
