@@ -66,10 +66,7 @@ abstract contract ERC721 is Initializable, IERC721 {
   INITIALIZATION LOGIC
   ////////////////////////////////////////////////////////////// */
 
-  function __initERC721(string memory _name, string memory _symbol)
-    public
-    initializer
-  {
+  function __initERC721(string memory _name, string memory _symbol) internal {
     ERC721Storage storage s = _loadERC721Slot();
     s.name = _name;
     s.symbol = _symbol;
