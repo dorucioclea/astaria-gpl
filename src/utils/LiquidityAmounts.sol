@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-pragma solidity ^0.8.4;
+
+pragma solidity =0.8.17;
 
 import "./FullMathUniswap.sol";
 
@@ -32,6 +33,7 @@ library LiquidityAmounts {
     uint160 sqrtRatioBX96,
     uint256 amount0
   ) internal pure returns (uint128 liquidity) {
+
     unchecked {
       if (sqrtRatioAX96 > sqrtRatioBX96)
         (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
@@ -62,6 +64,7 @@ library LiquidityAmounts {
     uint160 sqrtRatioBX96,
     uint256 amount1
   ) internal pure returns (uint128 liquidity) {
+
     unchecked {
       if (sqrtRatioAX96 > sqrtRatioBX96)
         (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
@@ -134,6 +137,7 @@ library LiquidityAmounts {
     uint160 sqrtRatioBX96,
     uint128 liquidity
   ) internal pure returns (uint256 amount0) {
+
     unchecked {
       if (sqrtRatioAX96 > sqrtRatioBX96)
         (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
