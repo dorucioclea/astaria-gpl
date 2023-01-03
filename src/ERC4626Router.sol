@@ -54,6 +54,7 @@ abstract contract ERC4626Router is IERC4626Router, ERC4626RouterBase {
     uint256 shareBalance = vault.balanceOf(msg.sender);
     uint256 maxRedeem = vault.maxRedeem(msg.sender);
     uint256 amountShares = maxRedeem < shareBalance ? maxRedeem : shareBalance;
+    pullToken(address(vault), amountShares, address(this));
     return redeem(vault, to, amountShares, minAmountOut);
   }
 }
