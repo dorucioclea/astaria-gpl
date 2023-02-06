@@ -45,7 +45,7 @@ abstract contract ERC4626RouterBase is IERC4626RouterBase, Multicall {
     uint256 maxSharesOut
   ) public payable virtual override returns (uint256 sharesOut) {
 
-    ERC20(address(vault)).safeApprove(address(vault), amount);
+    ERC20(address(vault)).safeApprove(address(vault), maxSharesOut);
     if ((sharesOut = vault.withdraw(amount, to, msg.sender)) > maxSharesOut) {
       revert MaxSharesError();
     }
