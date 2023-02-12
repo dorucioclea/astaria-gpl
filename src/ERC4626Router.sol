@@ -2,7 +2,7 @@
 pragma solidity ^0.8.17;
 
 import {IERC4626Router} from "gpl/interfaces/IERC4626Router.sol";
-import {IERC4626} from "core/interfaces/IERC4626.sol";
+import {IERC4626} from "src/interfaces/IERC4626.sol";
 
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {ERC4626RouterBase} from "gpl/ERC4626RouterBase.sol";
