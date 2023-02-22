@@ -3,7 +3,7 @@ pragma solidity >=0.8.16;
 
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
-import {Clone} from "clones-with-immutable-args/Clone.sol";
+import {Clone} from "create2-clones-with-immutable-args/Clone.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {ERC20Cloned} from "gpl/ERC20-Cloned.sol";
 import {IERC4626} from "core/interfaces/IERC4626.sol";
@@ -16,11 +16,10 @@ abstract contract ERC4626Cloned is IERC4626, ERC20Cloned {
 
   function asset() public view virtual returns (address);
 
-  function deposit(uint256 assets, address receiver)
-    public
-    virtual
-    returns (uint256 shares)
-  {
+  function deposit(
+    uint256 assets,
+    address receiver
+  ) public virtual returns (uint256 shares) {
     // Check for rounding error since we round down in previewDeposit.
     require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
 
