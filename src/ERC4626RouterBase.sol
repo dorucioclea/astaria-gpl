@@ -18,6 +18,7 @@ abstract contract ERC4626RouterBase is IERC4626RouterBase, Multicall {
     uint256 shares,
     uint256 maxAmountIn
   ) public payable virtual override returns (uint256 amountIn) {
+    ERC20(vault.asset()).safeApprove(address(vault), vault.previewMint(shares));
     if ((amountIn = vault.mint(shares, to)) > maxAmountIn) {
       revert MaxAmountError();
     }
